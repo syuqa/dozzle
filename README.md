@@ -29,6 +29,42 @@ https://github.com/user-attachments/assets/66a7b4b2-d6c9-4fca-ab04-aef6cd7c0c31
 - [Agent mode](https://dozzle.dev/guide/agent) for monitoring multiple Docker hosts
 - Dark mode
 
+## Additions In This Fork
+
+This fork extends Dozzle with container image vulnerability scanning powered by Trivy and a few UI customization options.
+
+- Trivy image scans directly from the container view
+- Cached last scan result to avoid unnecessary rescans
+- Scan mode in the main containers table with severity summary and quick report access
+- Scan alerts integrated into the standard notifications form
+- Scheduled scans with persisted state
+- Branding support with `DOZZLE_APP_NAME` and `DOZZLE_APP_LOGO_URL`
+
+### Trivy Scanning
+
+Enable container scanning with:
+
+```bash
+docker run --rm -p 8080:8080 \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -e DOZZLE_ENABLE_CONTAINER_SCAN=true \
+  amir20/dozzle:latest
+```
+
+If Trivy is not available in the runtime image, set a custom path with `DOZZLE_TRIVY_PATH` or bake the binary into your image.
+
+### Branding
+
+You can override the default Dozzle name and logo in the UI:
+
+```bash
+docker run --rm -p 8080:8080 \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -e DOZZLE_APP_NAME="My Platform" \
+  -e DOZZLE_APP_LOGO_URL="https://example.com/logo.png" \
+  amir20/dozzle:latest
+```
+
 Dozzle has been tested with hundreds of containers. However, it doesn't support offline searching. Products like [Loggly](https://www.loggly.com), [Papertrail](https://papertrailapp.com), or [Kibana](https://www.elastic.co/products/kibana) are better suited for full search capabilities.
 
 ## Getting Started
