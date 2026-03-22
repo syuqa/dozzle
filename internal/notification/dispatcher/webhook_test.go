@@ -31,6 +31,48 @@ func newTestNotification(detail string) types.Notification {
 	}
 }
 
+func newTestScanNotification() types.Notification {
+	return types.Notification{
+		ID:     "scan-123",
+		Type:   types.ScanNotification,
+		Detail: "Trivy scan found 2 vulnerabilities in nginx:latest (1 critical, 1 high, 0 medium, 0 low)",
+		Container: types.NotificationContainer{
+			ID:       "abc123",
+			Name:     "my-container",
+			Image:    "nginx:latest",
+			HostName: "docker-host",
+		},
+		Scan: &types.NotificationScan{
+			Image:        "nginx:latest",
+			GeneratedAt:  time.Now(),
+			PackageTypes: []string{"os", "python"},
+			Summary: types.NotificationScanSummary{
+				Critical: 1,
+				High:     1,
+				Total:    2,
+			},
+			Vulnerabilities: []types.NotificationScanVulnerability{
+				{
+					ID:           "CVE-2026-0001",
+					Severity:     "CRITICAL",
+					PackageName:  "openssl",
+					PackageType:  "os",
+					Target:       "alpine:3.20",
+					FixedVersion: "3.0.14-r1",
+				},
+				{
+					ID:          "CVE-2026-0002",
+					Severity:    "HIGH",
+					PackageName: "requests",
+					PackageType: "python",
+					Target:      "requirements.txt",
+				},
+			},
+		},
+		Timestamp: time.Now(),
+	}
+}
+
 func TestExecuteJSONTemplate_EscapesQuotes(t *testing.T) {
 	templateText := `{"message": "{{ .Detail }}"}`
 	notification := newTestNotification(`Server started {"service":"scoutarr","port":5839}`)
@@ -150,4 +192,27 @@ func TestExecuteJSONTemplate_InvalidJSONFallsBackToTextTemplate(t *testing.T) {
 	payload, err := executeJSONTemplate(templateText, notification)
 	require.NoError(t, err)
 	assert.Equal(t, "my-container: some log", string(payload))
+}
+
+func TestExecuteJSONTemplate_ScanPayloadFields(t *testing.T) {
+	templateText := `{
+		"type": "{{ .Type }}",
+		"image": "{{ .Scan.Image }}",
+		"critical": "{{ .Scan.Summary.Critical }}",
+		"firstCve": "{{ (index .Scan.Vulnerabilities 0).ID }}",
+		"firstPackage": "{{ (index .Scan.Vulnerabilities 0).PackageName }}"
+	}`
+	notification := newTestScanNotification()
+
+	payload, err := executeJSONTemplate(templateText, notification)
+	require.NoError(t, err)
+
+	var result map[string]any
+	err = json.Unmarshal(payload, &result)
+	require.NoError(t, err, "output should be valid JSON, got: %s", string(payload))
+	assert.Equal(t, "scan", result["type"])
+	assert.Equal(t, "nginx:latest", result["image"])
+	assert.Equal(t, "1", result["critical"])
+	assert.Equal(t, "CVE-2026-0001", result["firstCve"])
+	assert.Equal(t, "openssl", result["firstPackage"])
 }

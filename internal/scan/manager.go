@@ -628,9 +628,10 @@ func (m *Manager) dispatchAlerts(ctx context.Context, state *ContainerScanState,
 		}
 		notificationPayload := types.Notification{
 			ID:        fmt.Sprintf("scan-%s-%d", state.Container.ID, time.Now().Unix()),
-			Type:      types.NotificationType("scan"),
-			Detail:    fmt.Sprintf("Trivy scan found %d vulnerabilities in %s", state.Summary.Total, state.Container.Image),
+			Type:      types.ScanNotification,
+			Detail:    fmt.Sprintf("Trivy scan found %d vulnerabilities in %s (%d critical, %d high, %d medium, %d low)", state.Summary.Total, state.Container.Image, state.Summary.Critical, state.Summary.High, state.Summary.Medium, state.Summary.Low),
 			Container: types.NotificationContainer{ID: state.Container.ID, Name: state.Container.Name, Image: state.Container.Image, HostID: state.Container.Host, HostName: state.Container.Host},
+			Scan:      buildScanNotification(state.Result),
 			Subscription: types.SubscriptionConfig{
 				ID:                  alert.ID,
 				Name:                alert.Name,
@@ -642,6 +643,45 @@ func (m *Manager) dispatchAlerts(ctx context.Context, state *ContainerScanState,
 			log.Warn().Err(err).Str("alert", alert.Name).Msg("scan alert dispatch failed")
 		}
 	}
+}
+
+func buildScanNotification(result *trivy.Result) *types.NotificationScan {
+	if result == nil {
+		return nil
+	}
+
+	scanNotification := &types.NotificationScan{
+		Image:       result.Image,
+		GeneratedAt: result.GeneratedAt,
+		Summary: types.NotificationScanSummary{
+			Critical: result.Summary.Critical,
+			High:     result.Summary.High,
+			Medium:   result.Summary.Medium,
+			Low:      result.Summary.Low,
+			Unknown:  result.Summary.Unknown,
+			Total:    result.Summary.Total,
+		},
+		PackageTypes:    packageTypesFromResult(result),
+		Vulnerabilities: make([]types.NotificationScanVulnerability, 0),
+	}
+
+	for _, item := range result.Results {
+		for _, vuln := range item.Vulnerabilities {
+			scanNotification.Vulnerabilities = append(scanNotification.Vulnerabilities, types.NotificationScanVulnerability{
+				ID:               vuln.ID,
+				Severity:         strings.ToUpper(vuln.Severity),
+				Title:            vuln.Title,
+				PrimaryURL:       vuln.PrimaryURL,
+				PackageName:      vuln.PackageName,
+				PackageType:      item.Type,
+				Target:           item.Target,
+				InstalledVersion: vuln.InstalledVersion,
+				FixedVersion:     vuln.FixedVersion,
+			})
+		}
+	}
+
+	return scanNotification
 }
 
 func (m *Manager) syncContainers() {

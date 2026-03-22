@@ -8,6 +8,7 @@ type NotificationType string
 const (
 	LogNotification    NotificationType = "log"
 	MetricNotification NotificationType = "metric"
+	ScanNotification   NotificationType = "scan"
 )
 
 // Notification represents a notification event that can be filtered and sent
@@ -18,6 +19,7 @@ type Notification struct {
 	Container    NotificationContainer `json:"container"`
 	Log          *NotificationLog      `json:"log,omitempty"`
 	Stat         *NotificationStat     `json:"stat,omitempty"`
+	Scan         *NotificationScan     `json:"scan,omitempty"`
 	Subscription SubscriptionConfig    `json:"subscription"`
 	Timestamp    time.Time             `json:"timestamp"`
 }
@@ -49,6 +51,36 @@ type NotificationStat struct {
 	CPUPercent    float64 `json:"cpu" expr:"cpu"`
 	MemoryPercent float64 `json:"memory" expr:"memory"`
 	MemoryUsage   float64 `json:"memoryUsage" expr:"memoryUsage"`
+}
+
+// NotificationScan represents vulnerability scan details for scan-based alerts
+type NotificationScan struct {
+	Image           string                          `json:"image"`
+	GeneratedAt     time.Time                       `json:"generatedAt"`
+	Summary         NotificationScanSummary         `json:"summary"`
+	PackageTypes    []string                        `json:"packageTypes,omitempty"`
+	Vulnerabilities []NotificationScanVulnerability `json:"vulnerabilities,omitempty"`
+}
+
+type NotificationScanSummary struct {
+	Critical int `json:"critical"`
+	High     int `json:"high"`
+	Medium   int `json:"medium"`
+	Low      int `json:"low"`
+	Unknown  int `json:"unknown"`
+	Total    int `json:"total"`
+}
+
+type NotificationScanVulnerability struct {
+	ID               string `json:"id"`
+	Severity         string `json:"severity"`
+	Title            string `json:"title,omitempty"`
+	PrimaryURL       string `json:"primaryUrl,omitempty"`
+	PackageName      string `json:"packageName"`
+	PackageType      string `json:"packageType,omitempty"`
+	Target           string `json:"target,omitempty"`
+	InstalledVersion string `json:"installedVersion,omitempty"`
+	FixedVersion     string `json:"fixedVersion,omitempty"`
 }
 
 // SubscriptionConfig represents a notification subscription configuration
