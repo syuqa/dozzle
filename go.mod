@@ -1,8 +1,5 @@
 module github.com/amir20/dozzle
 
-replace modernc.org/sqlite => github.com/modernc-org/sqlite v1.47.0
-replace modernc.org/libc => github.com/modernc-org/libc v1.70.0
-
 require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/alexflint/go-arg v1.6.1
