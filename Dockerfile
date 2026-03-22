@@ -28,7 +28,7 @@ RUN apk add --no-cache ca-certificates git && mkdir /dozzle
 
 WORKDIR /dozzle
 
-ENV GOPROXY=https://goproxy.cn,direct
+ENV GOPROXY=direct
 ENV GOSUMDB=off
 
 # Copy go mod files
