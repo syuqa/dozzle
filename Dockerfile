@@ -28,6 +28,9 @@ RUN apk add --no-cache ca-certificates && mkdir /dozzle
 
 WORKDIR /dozzle
 
+ENV GOPROXY=direct
+ENV GOSUMDB=off
+
 # Copy go mod files
 COPY go.* ./
 RUN --mount=type=cache,target=/go/pkg/mod go mod download
@@ -43,7 +46,7 @@ COPY shared_key.pem shared_cert.pem ./
 COPY --from=node /build/dist ./dist
 
 # Args
-ARG TAG=dev
+ARG TAG=v10.1.2
 ARG TARGETOS TARGETARCH
 
 # Build binary
