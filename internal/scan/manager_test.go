@@ -2,6 +2,7 @@ package scan
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"os"
 	"path/filepath"
@@ -150,6 +151,54 @@ func TestManagerRunScanUsesAgentExecutor(t *testing.T) {
 	assert.Equal(t, expected.Image, state.Result.Image)
 	assert.Equal(t, 2, state.Summary.High)
 
-	_, err = os.Stat(filepath.Join(tmpDir, "data", "scans.json"))
+	_, err = os.Stat(filepath.Join(tmpDir, "data", "scans.db"))
+	assert.NoError(t, err)
+}
+
+func TestNotifyOnManualDefaultsToTrue(t *testing.T) {
+	alert := &ScanAlert{}
+	assert.True(t, notifyOnManual(alert))
+	value := false
+	alert.NotifyOnManual = &value
+	assert.False(t, notifyOnManual(alert))
+}
+
+func TestManagerMigratesLegacyJSONToSQLite(t *testing.T) {
+	tmpDir := t.TempDir()
+	originalWD, err := os.Getwd()
+	require.NoError(t, err)
+	require.NoError(t, os.Chdir(tmpDir))
+	t.Cleanup(func() {
+		_ = os.Chdir(originalWD)
+	})
+
+	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "data"), 0o755))
+	legacyState := persistedState{
+		Scans: map[string]*ContainerScanState{
+			"agent-1:123": {
+				Container: ContainerRef{ID: "123", Host: "agent-1", Name: "api", Image: "private/image:1.0.0"},
+				Summary:   trivy.Summary{High: 1, Total: 1},
+				Result:    &trivy.Result{Image: "private/image:1.0.0", Summary: trivy.Summary{High: 1, Total: 1}},
+				Schedule:  ScanSchedule{Enabled: true, IntervalMinutes: 60},
+			},
+		},
+		AlertNextID: 1,
+	}
+	file, err := os.Create(filepath.Join(tmpDir, "data", "scans.json"))
+	require.NoError(t, err)
+	require.NoError(t, json.NewEncoder(file).Encode(legacyState))
+	require.NoError(t, file.Close())
+
+	hostService := &stubHostService{
+		containerService: container_support.NewContainerService(&stubClientService{}, container.Container{}),
+	}
+	manager, err := NewManager(hostService, &stubScanner{})
+	require.NoError(t, err)
+
+	state := manager.GetState("agent-1", "123")
+	require.NotNil(t, state)
+	assert.Equal(t, "private/image:1.0.0", state.Result.Image)
+
+	_, err = os.Stat(filepath.Join(tmpDir, "data", "scans.db"))
 	assert.NoError(t, err)
 }

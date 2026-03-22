@@ -2,6 +2,7 @@ package scan
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -20,6 +21,7 @@ import (
 	"github.com/expr-lang/expr"
 	"github.com/expr-lang/expr/vm"
 	"github.com/rs/zerolog/log"
+	_ "modernc.org/sqlite"
 )
 
 type HostService interface {
@@ -101,6 +103,7 @@ type ScanAlert struct {
 	MinSeverity         Severity   `json:"minSeverity"`
 	PackageTypes        []string   `json:"packageTypes,omitempty"`
 	CooldownMinutes     int        `json:"cooldownMinutes,omitempty"`
+	NotifyOnManual      *bool      `json:"notifyOnManual,omitempty"`
 	TriggerCount        int64      `json:"triggerCount"`
 	LastTriggeredAt     *time.Time `json:"lastTriggeredAt,omitempty"`
 
@@ -116,11 +119,20 @@ type persistedState struct {
 type Manager struct {
 	hostService HostService
 	scanner     Scanner
-	filePath    string
+	dbPath      string
+	legacyPath  string
+	db          *sql.DB
 	mu          sync.RWMutex
 	state       persistedState
 	inFlight    map[string]struct{}
 }
+
+type ScanTrigger string
+
+const (
+	ScanTriggerManual    ScanTrigger = "manual"
+	ScanTriggerScheduled ScanTrigger = "scheduled"
+)
 
 func NewManager(hostService HostService, scanner Scanner) (*Manager, error) {
 	if err := os.MkdirAll("./data", 0755); err != nil {
@@ -130,7 +142,8 @@ func NewManager(hostService HostService, scanner Scanner) (*Manager, error) {
 	m := &Manager{
 		hostService: hostService,
 		scanner:     scanner,
-		filePath:    filepath.Clean("./data/scans.json"),
+		dbPath:      filepath.Clean("./data/scans.db"),
+		legacyPath:  filepath.Clean("./data/scans.json"),
 		inFlight:    make(map[string]struct{}),
 		state: persistedState{
 			Scans:  make(map[string]*ContainerScanState),
@@ -229,7 +242,120 @@ func cloneState(in *ContainerScanState) *ContainerScanState {
 }
 
 func (m *Manager) load() error {
-	file, err := os.Open(m.filePath)
+	db, err := sql.Open("sqlite", m.dbPath)
+	if err != nil {
+		return fmt.Errorf("open scan database: %w", err)
+	}
+	m.db = db
+	if _, err := m.db.Exec(`
+		CREATE TABLE IF NOT EXISTS scan_states (
+			scan_key TEXT PRIMARY KEY,
+			data TEXT NOT NULL
+		);
+		CREATE TABLE IF NOT EXISTS scan_alerts (
+			alert_id INTEGER PRIMARY KEY,
+			data TEXT NOT NULL
+		);
+		CREATE TABLE IF NOT EXISTS scan_meta (
+			key TEXT PRIMARY KEY,
+			value TEXT NOT NULL
+		);
+	`); err != nil {
+		return fmt.Errorf("init scan database schema: %w", err)
+	}
+
+	var scanCount int
+	if err := m.db.QueryRow(`SELECT COUNT(*) FROM scan_states`).Scan(&scanCount); err != nil {
+		return fmt.Errorf("count scan states: %w", err)
+	}
+
+	var alertCount int
+	if err := m.db.QueryRow(`SELECT COUNT(*) FROM scan_alerts`).Scan(&alertCount); err != nil {
+		return fmt.Errorf("count scan alerts: %w", err)
+	}
+
+	if scanCount == 0 && alertCount == 0 {
+		if err := m.loadLegacyJSON(); err != nil {
+			return err
+		}
+		if len(m.state.Scans) > 0 || len(m.state.Alerts) > 0 || m.state.AlertNextID > 0 {
+			return m.saveLocked()
+		}
+		return nil
+	}
+
+	state := persistedState{
+		Scans:  make(map[string]*ContainerScanState),
+		Alerts: []*ScanAlert{},
+	}
+
+	rows, err := m.db.Query(`SELECT scan_key, data FROM scan_states`)
+	if err != nil {
+		return fmt.Errorf("query scan states: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var key string
+		var raw string
+		if err := rows.Scan(&key, &raw); err != nil {
+			return fmt.Errorf("scan scan state row: %w", err)
+		}
+		var item ContainerScanState
+		if err := json.Unmarshal([]byte(raw), &item); err != nil {
+			return fmt.Errorf("decode scan state: %w", err)
+		}
+		state.Scans[key] = &item
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterate scan states: %w", err)
+	}
+
+	alertRows, err := m.db.Query(`SELECT alert_id, data FROM scan_alerts ORDER BY alert_id`)
+	if err != nil {
+		return fmt.Errorf("query scan alerts: %w", err)
+	}
+	defer alertRows.Close()
+
+	for alertRows.Next() {
+		var raw string
+		var alertID int
+		if err := alertRows.Scan(&alertID, &raw); err != nil {
+			return fmt.Errorf("scan alert row: %w", err)
+		}
+		var alert ScanAlert
+		if err := json.Unmarshal([]byte(raw), &alert); err != nil {
+			return fmt.Errorf("decode scan alert: %w", err)
+		}
+		alert.ID = alertID
+		state.Alerts = append(state.Alerts, &alert)
+	}
+	if err := alertRows.Err(); err != nil {
+		return fmt.Errorf("iterate scan alerts: %w", err)
+	}
+
+	var alertNextID string
+	err = m.db.QueryRow(`SELECT value FROM scan_meta WHERE key = 'alert_next_id'`).Scan(&alertNextID)
+	if err != nil && err != sql.ErrNoRows {
+		return fmt.Errorf("read alert_next_id: %w", err)
+	}
+	if alertNextID != "" {
+		if _, err := fmt.Sscanf(alertNextID, "%d", &state.AlertNextID); err != nil {
+			return fmt.Errorf("parse alert_next_id: %w", err)
+		}
+	}
+
+	for _, alert := range state.Alerts {
+		if err := compileAlert(alert); err != nil {
+			return err
+		}
+	}
+	m.state = state
+	return nil
+}
+
+func (m *Manager) loadLegacyJSON() error {
+	file, err := os.Open(m.legacyPath)
 	if os.IsNotExist(err) {
 		return nil
 	}
@@ -240,7 +366,7 @@ func (m *Manager) load() error {
 
 	var state persistedState
 	if err := json.NewDecoder(file).Decode(&state); err != nil {
-		return err
+		return fmt.Errorf("decode legacy scan json: %w", err)
 	}
 	if state.Scans == nil {
 		state.Scans = make(map[string]*ContainerScanState)
@@ -255,17 +381,57 @@ func (m *Manager) load() error {
 }
 
 func (m *Manager) saveLocked() error {
-	file, err := os.Create(m.filePath)
+	tx, err := m.db.Begin()
 	if err != nil {
-		return err
+		return fmt.Errorf("begin scan save tx: %w", err)
 	}
-	defer file.Close()
-	encoder := json.NewEncoder(file)
-	encoder.SetIndent("", "  ")
-	if err := encoder.Encode(m.state); err != nil {
-		return err
+
+	if _, err := tx.Exec(`DELETE FROM scan_states`); err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("clear scan states: %w", err)
 	}
-	return file.Sync()
+	if _, err := tx.Exec(`DELETE FROM scan_alerts`); err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("clear scan alerts: %w", err)
+	}
+	if _, err := tx.Exec(`DELETE FROM scan_meta`); err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("clear scan meta: %w", err)
+	}
+
+	for key, state := range m.state.Scans {
+		payload, err := json.Marshal(state)
+		if err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("encode scan state: %w", err)
+		}
+		if _, err := tx.Exec(`INSERT INTO scan_states(scan_key, data) VALUES(?, ?)`, key, string(payload)); err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("insert scan state: %w", err)
+		}
+	}
+
+	for _, alert := range m.state.Alerts {
+		payload, err := json.Marshal(alert)
+		if err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("encode scan alert: %w", err)
+		}
+		if _, err := tx.Exec(`INSERT INTO scan_alerts(alert_id, data) VALUES(?, ?)`, alert.ID, string(payload)); err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("insert scan alert: %w", err)
+		}
+	}
+
+	if _, err := tx.Exec(`INSERT INTO scan_meta(key, value) VALUES('alert_next_id', ?)`, fmt.Sprintf("%d", m.state.AlertNextID)); err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("insert scan meta: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit scan save tx: %w", err)
+	}
+	return nil
 }
 
 func compileAlert(alert *ScanAlert) error {
@@ -325,7 +491,7 @@ func (m *Manager) runDueScans(ctx context.Context) {
 		go func(host, id string) {
 			runCtx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 			defer cancel()
-			if _, err := m.RunScan(runCtx, host, id, true); err != nil {
+			if _, err := m.runScan(runCtx, host, id, true, ScanTriggerScheduled); err != nil {
 				log.Warn().Err(err).Str("host", host).Str("container", id).Msg("scheduled container scan failed")
 			}
 		}(host, id)
@@ -409,6 +575,10 @@ func (m *Manager) Summary() DashboardSummary {
 }
 
 func (m *Manager) RunScan(ctx context.Context, host, id string, force bool) (*ContainerScanState, error) {
+	return m.runScan(ctx, host, id, force, ScanTriggerManual)
+}
+
+func (m *Manager) runScan(ctx context.Context, host, id string, force bool, trigger ScanTrigger) (*ContainerScanState, error) {
 	m.syncContainers()
 	key := scanKey(host, id)
 
@@ -459,7 +629,7 @@ func (m *Manager) RunScan(ctx context.Context, host, id string, force bool) (*Co
 		return nil, err
 	}
 
-	stateOut, alerts, err := m.finishSuccess(key, containerService.Container, result)
+	stateOut, alerts, err := m.finishSuccess(key, containerService.Container, result, trigger)
 	if err != nil {
 		return nil, err
 	}
@@ -505,7 +675,7 @@ func (m *Manager) finishError(key string, scanErr error) {
 	_ = m.saveLocked()
 }
 
-func (m *Manager) finishSuccess(key string, c container.Container, result *trivy.Result) (*ContainerScanState, []*ScanAlert, error) {
+func (m *Manager) finishSuccess(key string, c container.Container, result *trivy.Result, trigger ScanTrigger) (*ContainerScanState, []*ScanAlert, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	state := m.state.Scans[key]
@@ -533,14 +703,14 @@ func (m *Manager) finishSuccess(key string, c container.Container, result *trivy
 		state.Schedule.IntervalMinutes = 60
 	}
 
-	alerts := m.matchingAlertsLocked(c, result)
+	alerts := m.matchingAlertsLocked(c, result, trigger)
 	if err := m.saveLocked(); err != nil {
 		return nil, nil, err
 	}
 	return cloneState(state), alerts, nil
 }
 
-func (m *Manager) matchingAlertsLocked(c container.Container, result *trivy.Result) []*ScanAlert {
+func (m *Manager) matchingAlertsLocked(c container.Container, result *trivy.Result, trigger ScanTrigger) []*ScanAlert {
 	if result == nil || result.Summary.Total == 0 {
 		return nil
 	}
@@ -557,6 +727,9 @@ func (m *Manager) matchingAlertsLocked(c container.Container, result *trivy.Resu
 	var matched []*ScanAlert
 	for _, alert := range m.state.Alerts {
 		if !alert.Enabled || alert.ContainerProgram == nil {
+			continue
+		}
+		if trigger == ScanTriggerManual && !notifyOnManual(alert) {
 			continue
 		}
 		value, err := expr.Run(alert.ContainerProgram, notificationContainer)
@@ -770,6 +943,13 @@ func (m *Manager) AddAlert(alert *ScanAlert) (*ScanAlert, error) {
 	}
 	out := *alert
 	return &out, nil
+}
+
+func notifyOnManual(alert *ScanAlert) bool {
+	if alert == nil || alert.NotifyOnManual == nil {
+		return true
+	}
+	return *alert.NotifyOnManual
 }
 
 func (m *Manager) UpdateAlert(id int, next *ScanAlert) (*ScanAlert, error) {
