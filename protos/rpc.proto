@@ -10,6 +10,7 @@ option go_package = "internal/agent/pb";
 service AgentService {
   rpc ListContainers(ListContainersRequest) returns (ListContainersResponse) {}
   rpc FindContainer(FindContainerRequest) returns (FindContainerResponse) {}
+  rpc RunContainerScan(RunContainerScanRequest) returns (RunContainerScanResponse) {}
   rpc StreamLogs(StreamLogsRequest) returns (stream StreamLogsResponse) {}
   rpc LogsBetweenDates(LogsBetweenDatesRequest) returns (stream StreamLogsResponse) {}
   rpc StreamRawBytes(StreamRawBytesRequest) returns (stream StreamRawBytesResponse) {}
@@ -43,6 +44,47 @@ message FindContainerRequest {
 
 message FindContainerResponse {
   Container container = 1;
+}
+
+message RunContainerScanRequest {
+  string containerId = 1;
+}
+
+message RunContainerScanResponse {
+  ScanResult result = 1;
+}
+
+message ScanResult {
+  string image = 1;
+  google.protobuf.Timestamp generatedAt = 2;
+  ScanSummary summary = 3;
+  repeated ScanTargetResult results = 4;
+}
+
+message ScanSummary {
+  int32 critical = 1;
+  int32 high = 2;
+  int32 medium = 3;
+  int32 low = 4;
+  int32 unknown = 5;
+  int32 total = 6;
+}
+
+message ScanTargetResult {
+  string target = 1;
+  string class = 2;
+  string type = 3;
+  repeated ScanVulnerability vulnerabilities = 4;
+}
+
+message ScanVulnerability {
+  string id = 1;
+  string packageName = 2;
+  string installedVersion = 3;
+  string fixedVersion = 4;
+  string severity = 5;
+  string title = 6;
+  string primaryUrl = 7;
 }
 
 message StreamLogsRequest {

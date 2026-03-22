@@ -15,6 +15,7 @@ import (
 	"github.com/amir20/dozzle/internal/notification"
 	container_support "github.com/amir20/dozzle/internal/support/container"
 	docker_support "github.com/amir20/dozzle/internal/support/docker"
+	"github.com/amir20/dozzle/internal/trivy"
 	"github.com/amir20/dozzle/types"
 	"github.com/rs/zerolog/log"
 )
@@ -116,7 +117,7 @@ func (a *AgentCmd) Run(args Args, embeddedCerts embed.FS) error {
 	}
 
 	// Create agent server using the same shared client service
-	server, err := agent.NewServer(clientService, certs, args.Version(), notificationHandler)
+	server, err := agent.NewServer(clientService, certs, args.Version(), notificationHandler, trivy.NewScanner(args.TrivyPath))
 	if err != nil {
 		return fmt.Errorf("failed to create agent server: %w", err)
 	}

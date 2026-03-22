@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/amir20/dozzle/internal/container"
+	"github.com/amir20/dozzle/internal/trivy"
 )
 
 type ContainerService struct {
@@ -42,4 +43,8 @@ func (c *ContainerService) Attach(ctx context.Context, events container.ExecEven
 
 func (c *ContainerService) Exec(ctx context.Context, cmd []string, events container.ExecEventReader, stdout io.Writer) error {
 	return c.clientService.Exec(ctx, c.Container, cmd, events, stdout)
+}
+
+func (c *ContainerService) RunScan(ctx context.Context) (*trivy.Result, error) {
+	return c.clientService.RunContainerScan(ctx, c.Container.ID)
 }

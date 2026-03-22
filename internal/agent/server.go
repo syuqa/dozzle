@@ -14,6 +14,7 @@ import (
 
 	"github.com/amir20/dozzle/internal/agent/pb"
 	"github.com/amir20/dozzle/internal/container"
+	"github.com/amir20/dozzle/internal/trivy"
 	"github.com/amir20/dozzle/types"
 	"github.com/rs/zerolog/log"
 	orderedmap "github.com/wk8/go-ordered-map/v2"
@@ -49,19 +50,25 @@ type ClientService interface {
 	Exec(context.Context, container.Container, []string, container.ExecEventReader, io.Writer) error
 }
 
+type ScanRunner interface {
+	ScanImage(ctx context.Context, image string) (*trivy.Result, error)
+}
+
 type server struct {
 	service                   ClientService
 	version                   string
 	notificationConfigHandler NotificationConfigHandler
+	scanRunner                ScanRunner
 
 	pb.UnimplementedAgentServiceServer
 }
 
-func newServer(service ClientService, dozzleVersion string, notificationHandler NotificationConfigHandler) pb.AgentServiceServer {
+func newServer(service ClientService, dozzleVersion string, notificationHandler NotificationConfigHandler, scanRunner ScanRunner) pb.AgentServiceServer {
 	return &server{
 		service:                   service,
 		version:                   dozzleVersion,
 		notificationConfigHandler: notificationHandler,
+		scanRunner:                scanRunner,
 	}
 }
 
@@ -217,6 +224,26 @@ func (s *server) FindContainer(ctx context.Context, in *pb.FindContainerRequest)
 	proto := c.ToProto()
 	return &pb.FindContainerResponse{
 		Container: &proto,
+	}, nil
+}
+
+func (s *server) RunContainerScan(ctx context.Context, in *pb.RunContainerScanRequest) (*pb.RunContainerScanResponse, error) {
+	if s.scanRunner == nil {
+		return nil, status.Error(codes.Unimplemented, "container scan is not configured on agent")
+	}
+
+	c, err := s.service.FindContainer(ctx, in.ContainerId, container.ContainerLabels{})
+	if err != nil {
+		return nil, status.Error(codes.NotFound, err.Error())
+	}
+
+	result, err := s.scanRunner.ScanImage(ctx, c.Image)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	return &pb.RunContainerScanResponse{
+		Result: scanResultToPb(result),
 	}, nil
 }
 
@@ -454,8 +481,8 @@ func (s *server) GetNotificationStats(ctx context.Context, req *pb.GetNotificati
 	pbStats := make([]*pb.NotificationSubscriptionStats, len(stats))
 	for i, s := range stats {
 		pbStat := &pb.NotificationSubscriptionStats{
-			SubscriptionId:       int32(s.SubscriptionID),
-			TriggerCount:         s.TriggerCount,
+			SubscriptionId:        int32(s.SubscriptionID),
+			TriggerCount:          s.TriggerCount,
 			TriggeredContainerIds: s.TriggeredContainerIDs,
 		}
 		if s.LastTriggeredAt != nil {
@@ -467,7 +494,7 @@ func (s *server) GetNotificationStats(ctx context.Context, req *pb.GetNotificati
 	return &pb.GetNotificationStatsResponse{Stats: pbStats}, nil
 }
 
-func NewServer(service ClientService, certificates tls.Certificate, dozzleVersion string, notificationHandler NotificationConfigHandler) (*grpc.Server, error) {
+func NewServer(service ClientService, certificates tls.Certificate, dozzleVersion string, notificationHandler NotificationConfigHandler, scanRunner ScanRunner) (*grpc.Server, error) {
 	caCertPool := x509.NewCertPool()
 	c, err := x509.ParseCertificate(certificates.Certificate[0])
 	if err != nil {
@@ -492,9 +519,52 @@ func NewServer(service ClientService, certificates tls.Certificate, dozzleVersio
 			PermitWithoutStream: true,
 		}),
 	)
-	pb.RegisterAgentServiceServer(grpcServer, newServer(service, dozzleVersion, notificationHandler))
+	pb.RegisterAgentServiceServer(grpcServer, newServer(service, dozzleVersion, notificationHandler, scanRunner))
 
 	return grpcServer, nil
+}
+
+func scanResultToPb(result *trivy.Result) *pb.ScanResult {
+	if result == nil {
+		return nil
+	}
+
+	out := &pb.ScanResult{
+		Image:       result.Image,
+		GeneratedAt: timestamppb.New(result.GeneratedAt),
+		Summary: &pb.ScanSummary{
+			Critical: int32(result.Summary.Critical),
+			High:     int32(result.Summary.High),
+			Medium:   int32(result.Summary.Medium),
+			Low:      int32(result.Summary.Low),
+			Unknown:  int32(result.Summary.Unknown),
+			Total:    int32(result.Summary.Total),
+		},
+		Results: make([]*pb.ScanTargetResult, 0, len(result.Results)),
+	}
+
+	for _, item := range result.Results {
+		target := &pb.ScanTargetResult{
+			Target:          item.Target,
+			Class:           item.Class,
+			Type:            item.Type,
+			Vulnerabilities: make([]*pb.ScanVulnerability, 0, len(item.Vulnerabilities)),
+		}
+		for _, vuln := range item.Vulnerabilities {
+			target.Vulnerabilities = append(target.Vulnerabilities, &pb.ScanVulnerability{
+				Id:               vuln.ID,
+				PackageName:      vuln.PackageName,
+				InstalledVersion: vuln.InstalledVersion,
+				FixedVersion:     vuln.FixedVersion,
+				Severity:         vuln.Severity,
+				Title:            vuln.Title,
+				PrimaryUrl:       vuln.PrimaryURL,
+			})
+		}
+		out.Results = append(out.Results, target)
+	}
+
+	return out
 }
 
 func logEventToPb(event *container.LogEvent) *pb.LogEvent {

@@ -453,7 +453,7 @@ func (m *Manager) RunScan(ctx context.Context, host, id string, force bool) (*Co
 		return nil, err
 	}
 
-	result, err := m.scanner.ScanImage(ctx, containerService.Container.Image)
+	result, err := m.executeScan(ctx, host, containerService)
 	if err != nil {
 		m.finishError(key, err)
 		return nil, err
@@ -466,6 +466,29 @@ func (m *Manager) RunScan(ctx context.Context, host, id string, force bool) (*Co
 
 	go m.dispatchAlerts(context.Background(), stateOut, alerts)
 	return stateOut, nil
+}
+
+func (m *Manager) executeScan(ctx context.Context, host string, containerService *container_support.ContainerService) (*trivy.Result, error) {
+	if m.isAgentHost(host) {
+		result, err := containerService.RunScan(ctx)
+		if err == nil {
+			return result, nil
+		}
+		if err != container_support.ErrContainerScanNotSupported {
+			return nil, err
+		}
+	}
+
+	return m.scanner.ScanImage(ctx, containerService.Container.Image)
+}
+
+func (m *Manager) isAgentHost(hostID string) bool {
+	for _, host := range m.hostService.Hosts() {
+		if host.ID == hostID {
+			return host.Type == "agent"
+		}
+	}
+	return false
 }
 
 func (m *Manager) finishError(key string, scanErr error) {

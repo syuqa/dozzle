@@ -2,13 +2,17 @@ package container_support
 
 import (
 	"context"
+	"errors"
 	"io"
 	"time"
 
 	"github.com/amir20/dozzle/internal/container"
+	"github.com/amir20/dozzle/internal/trivy"
 )
 
 type ContainerFilter = func(*container.Container) bool
+
+var ErrContainerScanNotSupported = errors.New("container scan not supported")
 
 type ClientService interface {
 	FindContainer(ctx context.Context, id string, labels container.ContainerLabels) (container.Container, error)
@@ -29,4 +33,7 @@ type ClientService interface {
 	// Terminal
 	Attach(context.Context, container.Container, container.ExecEventReader, io.Writer) error
 	Exec(context.Context, container.Container, []string, container.ExecEventReader, io.Writer) error
+
+	// Security scan
+	RunContainerScan(context.Context, string) (*trivy.Result, error)
 }

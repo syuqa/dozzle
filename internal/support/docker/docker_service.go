@@ -8,6 +8,8 @@ import (
 
 	"github.com/amir20/dozzle/internal/container"
 	"github.com/amir20/dozzle/internal/docker"
+	container_support "github.com/amir20/dozzle/internal/support/container"
+	"github.com/amir20/dozzle/internal/trivy"
 
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/rs/zerolog/log"
@@ -218,4 +220,8 @@ func (d *DockerClientService) Exec(ctx context.Context, c container.Container, c
 	wg.Wait()
 
 	return nil
+}
+
+func (d *DockerClientService) RunContainerScan(ctx context.Context, id string) (*trivy.Result, error) {
+	return nil, container_support.ErrContainerScanNotSupported
 }

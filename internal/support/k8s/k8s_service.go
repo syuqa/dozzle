@@ -11,6 +11,8 @@ import (
 
 	"github.com/amir20/dozzle/internal/container"
 	"github.com/amir20/dozzle/internal/k8s"
+	container_support "github.com/amir20/dozzle/internal/support/container"
+	"github.com/amir20/dozzle/internal/trivy"
 )
 
 type K8sClientService struct {
@@ -188,4 +190,8 @@ func (k *K8sClientService) Exec(ctx context.Context, c container.Container, cmd 
 
 	wg.Wait()
 	return nil
+}
+
+func (k *K8sClientService) RunContainerScan(ctx context.Context, id string) (*trivy.Result, error) {
+	return nil, container_support.ErrContainerScanNotSupported
 }

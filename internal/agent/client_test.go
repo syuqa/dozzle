@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/amir20/dozzle/internal/container"
+	"github.com/amir20/dozzle/internal/trivy"
 	"github.com/amir20/dozzle/internal/utils"
 	"github.com/go-faker/faker/v4"
 	"github.com/go-faker/faker/v4/pkg/options"
@@ -27,6 +28,7 @@ const bufSize = 1024 * 1024
 var lis *bufconn.Listener
 var certs tls.Certificate
 var mockService *MockedClientService
+var mockScanner *MockedScanRunner
 
 type MockedClientService struct {
 	mock.Mock
@@ -89,6 +91,18 @@ func (m *MockedClientService) Exec(ctx context.Context, c container.Container, c
 	return args.Error(0)
 }
 
+type MockedScanRunner struct {
+	mock.Mock
+}
+
+func (m *MockedScanRunner) ScanImage(ctx context.Context, image string) (*trivy.Result, error) {
+	args := m.Called(ctx, image)
+	if result := args.Get(0); result != nil {
+		return result.(*trivy.Result), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
 var wantedContainer = container.Container{}
 
 func init() {
@@ -131,10 +145,18 @@ func init() {
 	mockService.On("SubscribeContainersStarted", mock.Anything, mock.AnythingOfType("chan<- container.Container")).Return()
 
 	mockService.On("FindContainer", mock.Anything, "123456", mock.Anything).Return(wantedContainer, nil)
+	mockScanner = &MockedScanRunner{}
+	mockScanner.On("ScanImage", mock.Anything, wantedContainer.Image).Return(&trivy.Result{
+		Image: wantedContainer.Image,
+		Summary: trivy.Summary{
+			High:  1,
+			Total: 1,
+		},
+	}, nil)
 
 	mockService.On("Client").Return(nil)
 
-	server, _ := NewServer(mockService, certs, "test", nil)
+	server, _ := NewServer(mockService, certs, "test", nil, mockScanner)
 	go server.Serve(lis)
 }
 
@@ -164,4 +186,16 @@ func TestListContainers(t *testing.T) {
 	assert.Equal(t, []container.Container{
 		wantedContainer,
 	}, containers)
+}
+
+func TestRunContainerScan(t *testing.T) {
+	rpc, err := NewClient("passthrough://bufnet", certs, grpc.WithContextDialer(bufDialer))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := rpc.RunContainerScan(context.Background(), "123456")
+	assert.NoError(t, err)
+	assert.Equal(t, wantedContainer.Image, result.Image)
+	assert.Equal(t, 1, result.Summary.High)
 }

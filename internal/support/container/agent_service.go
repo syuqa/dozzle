@@ -9,6 +9,7 @@ import (
 
 	"github.com/amir20/dozzle/internal/agent"
 	"github.com/amir20/dozzle/internal/container"
+	"github.com/amir20/dozzle/internal/trivy"
 	"github.com/amir20/dozzle/types"
 	"github.com/rs/zerolog/log"
 )
@@ -82,6 +83,10 @@ func (a *agentService) Attach(ctx context.Context, c container.Container, events
 
 func (a *agentService) Exec(ctx context.Context, c container.Container, cmd []string, events container.ExecEventReader, stdout io.Writer) error {
 	return a.client.Exec(ctx, c.ID, cmd, events, stdout)
+}
+
+func (a *agentService) RunContainerScan(ctx context.Context, id string) (*trivy.Result, error) {
+	return a.client.RunContainerScan(ctx, id)
 }
 
 func (a *agentService) UpdateNotificationConfig(ctx context.Context, subscriptions []types.SubscriptionConfig, dispatchers []types.DispatcherConfig) error {

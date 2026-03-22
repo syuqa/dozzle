@@ -15,6 +15,7 @@ import (
 
 	"github.com/amir20/dozzle/internal/agent/pb"
 	"github.com/amir20/dozzle/internal/container"
+	"github.com/amir20/dozzle/internal/trivy"
 	"github.com/amir20/dozzle/types"
 	"github.com/rs/zerolog/log"
 	orderedmap "github.com/wk8/go-ordered-map/v2"
@@ -347,6 +348,17 @@ func (c *Client) Host(ctx context.Context) (container.Host, error) {
 	}, nil
 }
 
+func (c *Client) RunContainerScan(ctx context.Context, containerID string) (*trivy.Result, error) {
+	resp, err := c.client.RunContainerScan(ctx, &pb.RunContainerScanRequest{
+		ContainerId: containerID,
+	})
+	if err != nil {
+		return nil, rpcErrToErr(err)
+	}
+
+	return scanResultFromPb(resp.GetResult()), nil
+}
+
 func (c *Client) ContainerAction(ctx context.Context, containerId string, action container.ContainerAction) error {
 	var containerAction pb.ContainerAction
 	switch action {
@@ -364,6 +376,51 @@ func (c *Client) ContainerAction(ctx context.Context, containerId string, action
 	_, err := c.client.ContainerAction(ctx, &pb.ContainerActionRequest{ContainerId: containerId, Action: containerAction})
 
 	return err
+}
+
+func scanResultFromPb(result *pb.ScanResult) *trivy.Result {
+	if result == nil {
+		return nil
+	}
+
+	out := &trivy.Result{
+		Image: result.Image,
+		Summary: trivy.Summary{
+			Critical: int(result.GetSummary().GetCritical()),
+			High:     int(result.GetSummary().GetHigh()),
+			Medium:   int(result.GetSummary().GetMedium()),
+			Low:      int(result.GetSummary().GetLow()),
+			Unknown:  int(result.GetSummary().GetUnknown()),
+			Total:    int(result.GetSummary().GetTotal()),
+		},
+		Results: make([]trivy.TargetResult, 0, len(result.Results)),
+	}
+	if result.GeneratedAt != nil {
+		out.GeneratedAt = result.GeneratedAt.AsTime()
+	}
+
+	for _, item := range result.Results {
+		target := trivy.TargetResult{
+			Target:          item.Target,
+			Class:           item.Class,
+			Type:            item.Type,
+			Vulnerabilities: make([]trivy.Vulnerability, 0, len(item.Vulnerabilities)),
+		}
+		for _, vuln := range item.Vulnerabilities {
+			target.Vulnerabilities = append(target.Vulnerabilities, trivy.Vulnerability{
+				ID:               vuln.Id,
+				PackageName:      vuln.PackageName,
+				InstalledVersion: vuln.InstalledVersion,
+				FixedVersion:     vuln.FixedVersion,
+				Severity:         vuln.Severity,
+				Title:            vuln.Title,
+				PrimaryURL:       vuln.PrimaryUrl,
+			})
+		}
+		out.Results = append(out.Results, target)
+	}
+
+	return out
 }
 
 func (c *Client) ContainerAttach(ctx context.Context, containerId string) (*container.ExecSession, error) {
