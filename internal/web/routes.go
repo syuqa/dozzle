@@ -125,7 +125,7 @@ func createRouter(h *handler) *chi.Mux {
 	r := chi.NewRouter()
 
 	if !h.config.Dev {
-		r.Use(cspHeaders)
+		r.Use(h.cspHeaders)
 	}
 
 	if h.config.Authorization.Provider != NONE && h.config.Authorization.Authorizer == nil {
