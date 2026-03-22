@@ -2,8 +2,9 @@
   <aside class="fixed flex h-screen w-[inherit] flex-col gap-4 p-3" data-testid="navigation">
     <h1>
       <router-link :to="{ name: '/' }" class="flex w-full items-center gap-4 overflow-hidden text-4xl font-thin">
-        <Logo class="h-14 w-14 shrink-0" />
-        Dozzle
+        <img v-if="appLogoUrl" :src="appLogoUrl" :alt="appName" class="h-14 w-14 shrink-0 object-contain" />
+        <Logo v-else class="h-14 w-14 shrink-0" />
+        <span class="truncate">{{ appName }}</span>
       </router-link>
 
       <small class="mt-4 block text-sm font-light" v-if="hostname">{{ hostname }}</small>
@@ -26,7 +27,9 @@
 
 <script lang="ts" setup>
 import Logo from "@/logo.svg";
-const { hostname } = config;
+const hostname = config.hostname;
+const appName = config.appName?.trim() || "Dozzle";
+const appLogoUrl = config.appLogoUrl?.trim();
 </script>
 
 <style scoped></style>

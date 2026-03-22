@@ -47,7 +47,7 @@
         <!-- Filter Tabs -->
         <div class="tabs tabs-box mb-6">
           <button class="tab" :class="{ 'tab-active': filter === 'all' }" @click="filter = 'all'">
-            {{ $t("notifications.filter.all", { count: alerts.length }) }}
+            {{ $t("notifications.filter.all", { count: unifiedAlerts.length }) }}
           </button>
           <button class="tab" :class="{ 'tab-active': filter === 'enabled' }" @click="filter = 'enabled'">
             {{ $t("notifications.filter.enabled", { count: enabledCount }) }}
@@ -58,11 +58,11 @@
         </div>
 
         <!-- Alerts List -->
-        <div v-if="!alerts.length" class="text-base-content/60 py-4">
+        <div v-if="!filteredAlerts.length" class="text-base-content/60 py-4">
           {{ $t("notifications.no-alerts") }}
         </div>
         <div v-else class="space-y-4">
-          <AlertCard v-for="alert in filteredAlerts" :key="alert.id" :alert="alert" :on-updated="fetchAlerts" />
+          <AlertCard v-for="alert in filteredAlerts" :key="`${alert.type ?? 'log'}:${alert.id}`" :alert="alert" :on-updated="fetchAll" />
         </div>
       </div>
     </section>
@@ -70,7 +70,7 @@
 </template>
 
 <script lang="ts" setup>
-import type { NotificationRule, Dispatcher } from "@/types/notifications";
+import type { NotificationRule, Dispatcher, ScanAlert, UnifiedAlert } from "@/types/notifications";
 import AlertForm from "@/components/Notification/AlertForm.vue";
 import DestinationForm from "@/components/Notification/DestinationForm.vue";
 
@@ -79,6 +79,7 @@ const router = useRouter();
 
 // State
 const alerts = ref<NotificationRule[]>([]);
+const scanAlerts = ref<ScanAlert[]>([]);
 const dispatchers = ref<Dispatcher[]>([]);
 
 async function fetchAlerts() {
@@ -91,8 +92,15 @@ async function fetchDispatchers() {
   dispatchers.value = await res.json();
 }
 
+async function fetchScanAlerts() {
+  const res = await fetch(withBase("/api/scans/alerts"));
+  if (res.ok) {
+    scanAlerts.value = await res.json();
+  }
+}
+
 async function fetchAll() {
-  await Promise.all([fetchAlerts(), fetchDispatchers()]);
+  await Promise.all([fetchAlerts(), fetchDispatchers(), fetchScanAlerts()]);
 }
 
 // Handle cloudLinkSuccess hash param
@@ -122,27 +130,36 @@ onMounted(async () => {
 // Local state
 const filter = ref<"all" | "enabled" | "paused">("all");
 
-const enabledCount = computed(() => alerts.value.filter((a) => a.enabled).length);
-const pausedCount = computed(() => alerts.value.filter((a) => !a.enabled).length);
+const unifiedAlerts = computed<UnifiedAlert[]>(() => [
+  ...alerts.value.map((alert) => ({ ...alert, type: (alert.metricExpression ? "metric" : "log") as const })),
+  ...scanAlerts.value.map((alert) => {
+    const dispatcher = dispatchers.value.find((item) => item.id === alert.dispatcherId) ?? null;
+    return { ...alert, dispatcher, triggeredContainers: 0, type: "scan" as const } as UnifiedAlert;
+  }),
+]);
+
+const enabledCount = computed(() => unifiedAlerts.value.filter((a) => a.enabled).length);
+const pausedCount = computed(() => unifiedAlerts.value.filter((a) => !a.enabled).length);
 
 const filteredAlerts = computed(() => {
-  if (filter.value === "enabled") return alerts.value.filter((a) => a.enabled);
-  if (filter.value === "paused") return alerts.value.filter((a) => !a.enabled);
-  return alerts.value;
+  if (filter.value === "enabled") return unifiedAlerts.value.filter((a) => a.enabled);
+  if (filter.value === "paused") return unifiedAlerts.value.filter((a) => !a.enabled);
+  return unifiedAlerts.value;
 });
 
 function openCreateAlert() {
-  showDrawer(AlertForm, { onCreated: fetchAlerts }, "lg");
+  showDrawer(AlertForm, { onCreated: fetchAll }, "lg");
 }
 
 function openAddDestination() {
   showDrawer(
     DestinationForm,
     {
-      onCreated: fetchDispatchers,
+      onCreated: fetchAll,
       existingDispatchers: dispatchers.value,
     },
     "md",
   );
 }
+
 </script>

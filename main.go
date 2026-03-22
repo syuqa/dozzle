@@ -19,9 +19,11 @@ import (
 	"github.com/amir20/dozzle/internal/docker"
 	"github.com/amir20/dozzle/internal/k8s"
 	"github.com/amir20/dozzle/internal/notification/dispatcher"
+	"github.com/amir20/dozzle/internal/scan"
 	"github.com/amir20/dozzle/internal/support/cli"
 	docker_support "github.com/amir20/dozzle/internal/support/docker"
 	k8s_support "github.com/amir20/dozzle/internal/support/k8s"
+	"github.com/amir20/dozzle/internal/trivy"
 	"github.com/amir20/dozzle/internal/web"
 	"github.com/rs/zerolog/log"
 )
@@ -210,11 +212,23 @@ func createServer(args cli.Args, hostService web.HostService) *http.Server {
 		authTTL = ttl
 	}
 
+	var scanManager web.ScanManager
+	if args.EnableContainerScan {
+		manager, err := scan.NewManager(hostService, trivy.NewScanner(args.TrivyPath))
+		if err != nil {
+			log.Fatal().Err(err).Msg("Could not create scan manager")
+		}
+		manager.Start(context.Background())
+		scanManager = manager
+	}
+
 	config := web.Config{
 		Addr:        args.Addr,
 		Base:        args.Base,
 		Version:     args.Version(),
 		Hostname:    args.Hostname,
+		AppName:     args.AppName,
+		AppLogoURL:  args.AppLogoURL,
 		NoAnalytics: args.NoAnalytics,
 		Dev:         dev,
 		Mode:        args.Mode,
@@ -224,11 +238,14 @@ func createServer(args cli.Args, hostService web.HostService) *http.Server {
 			TTL:        authTTL,
 			LogoutUrl:  args.AuthLogoutUrl,
 		},
-		EnableActions:    args.EnableActions,
-		EnableShell:      args.EnableShell,
-		DisableAvatars:   args.DisableAvatars,
-		ReleaseCheckMode: releaseCheckMode,
-		Labels:           args.Filter,
+		EnableActions:       args.EnableActions,
+		EnableContainerScan: args.EnableContainerScan,
+		TrivyPath:           args.TrivyPath,
+		ScanManager:         scanManager,
+		EnableShell:         args.EnableShell,
+		DisableAvatars:      args.DisableAvatars,
+		ReleaseCheckMode:    releaseCheckMode,
+		Labels:              args.Filter,
 	}
 
 	assets, err := fs.Sub(content, "dist")

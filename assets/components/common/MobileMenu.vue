@@ -3,7 +3,8 @@
     <div class="p-2">
       <div class="flex items-center">
         <router-link :to="{ name: '/' }">
-          <Logo class="h-10" />
+          <img v-if="appLogoUrl" :src="appLogoUrl" :alt="appName" class="h-10 w-10 object-contain" />
+          <Logo v-else class="h-10" />
         </router-link>
 
         <div class="ml-auto flex items-center gap-2">
@@ -30,6 +31,8 @@
 <script lang="ts" setup>
 import Logo from "@/logo.svg";
 const route = useRoute();
+const appName = config.appName?.trim() || "Dozzle";
+const appLogoUrl = config.appLogoUrl?.trim();
 
 const show = ref(false);
 watch(route, () => {

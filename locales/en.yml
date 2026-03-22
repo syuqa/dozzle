@@ -3,6 +3,7 @@ toolbar:
   download: Download
   download-filtered: Download Filtered Logs
   search: Search
+  scan-with-trivy: Scan with Trivy
   show: Show {std}
   show-all: Show all
   stop: Stop
@@ -41,6 +42,13 @@ label:
   created: Created
   avg-cpu: Avg. CPU (%)
   avg-mem: Avg. MEM (%)
+  vulnerabilities: Vulnerabilities
+  scan-report: Scan Report
+  last-scan: Last scan
+  scanning: Scanning...
+  scan-not-scanned: Not scanned
+  scan-manual: Manual
+  every-minutes: Every {count} min
   pinned: Pinned
   per-page: Rows per page
   host-menu: Hosts and Containers
@@ -57,6 +65,7 @@ tooltip:
 error:
   page-not-found: This page does not exist
   invalid-auth: Username or password are not valid
+  unable-to-run-trivy-scan: Unable to run Trivy scan
   copy-not-supported: Copy to clipboard is not supported in your browser
   copy-not-supported-hint: Clipboard unavailable. Copy the link below
   logs-skipped: Show {total} hidden entries
@@ -90,9 +99,33 @@ title:
 button:
   logout: Logout
   login: Login
+  refresh: Refresh
   settings: Settings
   cancel: Cancel
   redirect: Redirect
+scan:
+  title: Trivy Scan
+  summary-title: Security Scan Summary
+  scanning-image: Scanning image with Trivy...
+  scheduled: Scheduled
+  interval-minutes: Interval (min)
+  last-successful-scan: Last successful scan
+  no-saved-scan: No saved scan yet. Run a scan to populate results.
+  no-vulnerabilities: No vulnerabilities found.
+  critical: Critical
+  high: High
+  medium: Medium
+  low: Low
+  total: Total
+  scanned: Scanned
+  running: Running
+  container: Container
+  image: Image
+  package: Package
+  installed: Installed
+  fixed: Fixed
+  severity: Severity
+  never: Never
 placeholder:
   search-containers: Search containers (⌘ + k, ⌃k)
   search: Search
@@ -187,6 +220,10 @@ notifications:
     containers: Containers
     log-filter: Log filter
     metric-filter: Metric
+    scan-severity: Minimum severity
+    scan-package-types: Package types
+    scan-all-package-types: all package types
+    scan-cooldown-minutes: "{count} min"
     cooldown: Cooldown
     sample-window: Sample window
     destination: Destination
@@ -228,6 +265,11 @@ notifications:
     alert-type: Alert Type
     log-alert: Log Alert
     metric-alert: Metric Alert
+    scan-alert: Scan Alert
+    scan-severity: Minimum severity
+    scan-package-types: Package types
+    scan-package-types-placeholder: e.g. os, jar, python-pkg
+    scan-cooldown-hint: "{count} minutes between scan alerts per container"
   destination-form:
     create-title: Add Destination
     edit-title: Edit Destination

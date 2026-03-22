@@ -60,6 +60,15 @@
           >
             <mdi:poll class="scale-x-[-1] rotate-90" />
           </button>
+          <button
+            class="btn join-item btn-xs md:btn-sm"
+            :class="statMode === 'scan' ? 'btn-active' : 'btn-ghost'"
+            @click="statMode = 'scan'"
+            v-if="config.enableContainerScan"
+            :title="$t('label.vulnerabilities')"
+          >
+            <mdi:shield-search />
+          </button>
         </div>
       </div>
     </div>
@@ -75,7 +84,7 @@
               v-show="isVisible(key)"
             >
               <a class="inline-flex cursor-pointer gap-2 text-sm uppercase">
-                <span>{{ $t(value.label) }}</span>
+                <span>{{ columnLabel(key) }}</span>
                 <span class="h-4" data-icon>
                   <mdi:arrow-up />
                 </span>
@@ -87,7 +96,6 @@
           <tr
             v-for="container in paginated"
             :key="container.id"
-            v-memo="[container.id, statMode]"
             class="hover:bg-base-100/80!"
           >
             <td v-if="isVisible('name')" class="max-w-80 truncate">
@@ -101,10 +109,53 @@
               <RelativeTime :date="container.created" />
             </td>
             <td v-if="isVisible('cpu')">
-              <ContainerStatCell :container="container" type="cpu" :host="hosts[container.host]" :mode="statMode" />
+              <template v-if="statMode === 'scan'">
+                <div class="flex flex-wrap items-center gap-2" v-if="scanItem(container)">
+                  <span class="badge badge-error badge-outline" v-if="scanItem(container)?.summary.critical">
+                    C {{ scanItem(container)?.summary.critical }}
+                  </span>
+                  <span class="badge badge-warning badge-outline" v-if="scanItem(container)?.summary.high">
+                    H {{ scanItem(container)?.summary.high }}
+                  </span>
+                  <span class="badge badge-info badge-outline" v-if="scanItem(container)?.summary.medium">
+                    M {{ scanItem(container)?.summary.medium }}
+                  </span>
+                  <span class="badge badge-ghost">{{ scanItem(container)?.summary.total || 0 }}</span>
+                </div>
+                <div class="text-base-content/70 text-sm" v-if="scanItem(container)?.running">
+                  {{ $t("label.scanning") }}
+                </div>
+                <div class="text-error truncate text-sm" v-else-if="scanItem(container)?.lastError">
+                  {{ scanItem(container)?.lastError }}
+                </div>
+                <div class="text-base-content/70 text-sm" v-else-if="!scanItem(container)">
+                  {{ $t("label.scan-not-scanned") }}
+                </div>
+              </template>
+              <ContainerStatCell v-else :container="container" type="cpu" :host="hosts[container.host]" :mode="statMode" />
             </td>
             <td v-if="isVisible('mem')">
-              <ContainerStatCell :container="container" type="mem" :host="hosts[container.host]" :mode="statMode" />
+              <template v-if="statMode === 'scan'">
+                <div class="flex items-center justify-between gap-3">
+                  <div class="text-base-content/70 text-sm">
+                    <span v-if="scanItem(container)?.lastSuccessAt">
+                      <RelativeTime :date="scanLastSuccessDate(container)!" />
+                    </span>
+                    <span v-else-if="scanItem(container)?.schedule?.enabled">
+                      {{ $t("label.every-minutes", { count: scanItem(container)?.schedule?.intervalMinutes }) }}
+                    </span>
+                    <span v-else>{{ $t("label.scan-manual") }}</span>
+                  </div>
+                  <button
+                    class="btn btn-ghost btn-xs md:btn-sm"
+                    @click.stop="openScanReport(container)"
+                    :title="$t('label.scan-report')"
+                  >
+                    <mdi:file-document-outline />
+                  </button>
+                </div>
+              </template>
+              <ContainerStatCell v-else :container="container" type="mem" :host="hosts[container.host]" :mode="statMode" />
             </td>
           </tr>
         </tbody>
@@ -132,9 +183,14 @@
 </template>
 
 <script setup lang="ts">
+import ContainerTrivyScan from "@/components/ContainerViewer/ContainerTrivyScan.vue";
 import { Container } from "@/models/Container";
+import config, { withBase } from "@/stores/config";
+import type { ScanDashboardSummary } from "@/types/scans";
 import { toRefs } from "@vueuse/core";
 
+const { t } = useI18n();
+const showDrawer = useDrawer();
 const { hosts } = useHosts();
 const selectedHost = ref(null);
 
@@ -190,9 +246,19 @@ const { containers } = defineProps<{
 }>();
 type keys = keyof typeof fields;
 
-const statMode = useStorage<"chart" | "progress">("DOZZLE_TABLE_STAT_MODE", "chart");
+type StatMode = "chart" | "progress" | "scan";
+
+const statMode = useStorage<StatMode>("DOZZLE_TABLE_STAT_MODE", "chart");
 const perPage = useStorage("DOZZLE_TABLE_PAGE_SIZE", 15);
 const pageSizes = [15, 30, 50, 100];
+const scanSummary = ref<ScanDashboardSummary>();
+const scanItems = computed(
+  () =>
+    new Map(
+      (scanSummary.value?.items ?? []).map((item) => [`${item.container.host}:${item.container.id}`, item] as const),
+    ),
+);
+let scanTimer: number | undefined;
 
 const storage = useStorage<{ column: keys; direction: 1 | -1 }>("DOZZLE_TABLE_CONTAINERS_SORT", {
   column: "created" as keys,
@@ -204,8 +270,8 @@ const filteredContainers = computed(() =>
   containers.filter((c) => selectedHost.value === null || c.host === selectedHost.value),
 );
 const sortedContainers = computedWithControl(
-  () => [filteredContainers.value.length, sortField.value, direction.value, counter.value],
-  () => filteredContainers.value.sort((a, b) => fields[sortField.value].sortFunc(a, b)),
+  () => [filteredContainers.value.length, sortField.value, direction.value, counter.value, statMode.value, scanSummary.value],
+  () => filteredContainers.value.slice().sort((a, b) => sortContainers(a, b, sortField.value)),
 );
 
 const totalPages = computed(() => Math.ceil(sortedContainers.value.length / perPage.value));
@@ -230,6 +296,77 @@ function sort(field: keys) {
 function isVisible(field: keys) {
   return fields[field].mobileVisible || !isMobile.value;
 }
+
+function columnLabel(field: keys) {
+  if (statMode.value === "scan") {
+    if (field === "cpu") return t("label.vulnerabilities");
+    if (field === "mem") return t("label.last-scan");
+  }
+  return t(fields[field].label);
+}
+
+function scanItem(container: Container) {
+  return scanItems.value.get(`${container.host}:${container.id}`);
+}
+
+function scanSortValue(container: Container) {
+  const item = scanItem(container);
+  return {
+    critical: item?.summary.critical ?? -1,
+    high: item?.summary.high ?? -1,
+    total: item?.summary.total ?? -1,
+  };
+}
+
+function scanLastSuccessValue(container: Container) {
+  const item = scanItem(container);
+  if (!item?.lastSuccessAt) return 0;
+  return new Date(item.lastSuccessAt).getTime();
+}
+
+function scanLastSuccessDate(container: Container) {
+  const item = scanItem(container);
+  if (!item?.lastSuccessAt) return undefined;
+  return new Date(item.lastSuccessAt);
+}
+
+function sortContainers(a: Container, b: Container, field: keys) {
+  if (statMode.value === "scan" && field === "cpu") {
+    const left = scanSortValue(a);
+    const right = scanSortValue(b);
+    if (left.critical !== right.critical) return (left.critical - right.critical) * direction.value;
+    if (left.high !== right.high) return (left.high - right.high) * direction.value;
+    if (left.total !== right.total) return (left.total - right.total) * direction.value;
+    return a.name.localeCompare(b.name) * direction.value;
+  }
+  if (statMode.value === "scan" && field === "mem") {
+    return (scanLastSuccessValue(a) - scanLastSuccessValue(b)) * direction.value;
+  }
+  return fields[field].sortFunc(a, b);
+}
+
+function openScanReport(container: Container) {
+  showDrawer(ContainerTrivyScan, { container }, "lg");
+}
+
+async function fetchScanSummary() {
+  if (!config.enableContainerScan) return;
+  const response = await fetch(withBase("/api/scans/summary"));
+  if (!response.ok) return;
+  scanSummary.value = await response.json();
+}
+
+onMounted(async () => {
+  if (!config.enableContainerScan) return;
+  await fetchScanSummary();
+  scanTimer = window.setInterval(fetchScanSummary, 60000);
+});
+
+onBeforeUnmount(() => {
+  if (scanTimer) {
+    window.clearInterval(scanTimer);
+  }
+});
 </script>
 
 <style scoped>

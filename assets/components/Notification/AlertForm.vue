@@ -41,6 +41,15 @@
           <mdi:chart-line class="mr-1" />
           {{ $t("notifications.alert-form.metric-alert") }}
         </button>
+        <button
+          class="btn btn-sm"
+          :class="alertType === 'scan' ? 'btn-primary' : 'btn-outline'"
+          @click="alertType = 'scan'"
+          v-if="config.enableContainerScan"
+        >
+          <mdi:shield-search class="mr-1" />
+          {{ $t("notifications.alert-form.scan-alert") }}
+        </button>
       </div>
     </fieldset>
 
@@ -76,26 +85,53 @@
     </fieldset>
 
     <!-- Type-specific fields -->
-    <KeepAlive>
-      <LogAlertFields
-        v-if="alertType === 'log'"
-        ref="fieldsRef"
-        :alert="alert"
-        :prefill="prefill"
-        :container-expression="containerExpression"
-        :is-loading="isLoading"
-        :validate-preview="validatePreview"
-      />
-      <MetricAlertFields
-        v-else
-        ref="fieldsRef"
-        :alert="alert"
-        :prefill="prefill"
-        :container-expression="containerExpression"
-        :is-loading="isLoading"
-        :validate-preview="validatePreview"
-      />
-    </KeepAlive>
+    <LogAlertFields
+      v-if="alertType === 'log'"
+      ref="fieldsRef"
+      :alert="standardAlert"
+      :prefill="prefill"
+      :container-expression="containerExpression"
+      :is-loading="isLoading"
+      :validate-preview="validatePreview"
+    />
+    <MetricAlertFields
+      v-else-if="alertType === 'metric'"
+      ref="fieldsRef"
+      :alert="standardAlert"
+      :prefill="prefill"
+      :container-expression="containerExpression"
+      :is-loading="isLoading"
+      :validate-preview="validatePreview"
+    />
+    <div v-else class="space-y-4">
+      <fieldset class="fieldset">
+        <legend class="fieldset-legend text-lg">{{ $t("notifications.alert-form.scan-severity") }}</legend>
+        <select class="select w-full" v-model="scanSeverity">
+          <option value="LOW">LOW</option>
+          <option value="MEDIUM">MEDIUM</option>
+          <option value="HIGH">HIGH</option>
+          <option value="CRITICAL">CRITICAL</option>
+        </select>
+      </fieldset>
+
+      <fieldset class="fieldset">
+        <legend class="fieldset-legend text-lg">{{ $t("notifications.alert-form.scan-package-types") }}</legend>
+        <input
+          v-model="scanPackageTypes"
+          type="text"
+          class="input w-full"
+          :placeholder="$t('notifications.alert-form.scan-package-types-placeholder')"
+        />
+      </fieldset>
+
+      <fieldset class="fieldset">
+        <legend class="fieldset-legend text-lg">{{ $t("notifications.alert-form.cooldown-label") }}</legend>
+        <input v-model.number="scanCooldownMinutes" type="range" min="5" max="1440" step="5" class="range range-primary" />
+        <p class="text-base-content/50 mt-1 text-xs">
+          {{ $t("notifications.alert-form.scan-cooldown-hint", { count: scanCooldownMinutes }) }}
+        </p>
+      </fieldset>
+    </div>
 
     <!-- Destination -->
     <fieldset class="fieldset">
@@ -153,15 +189,16 @@
 </template>
 
 <script lang="ts" setup>
+import config from "@/stores/config";
 import { useAlertForm } from "@/composable/alertForm";
 import LogAlertFields from "./LogAlertFields.vue";
 import MetricAlertFields from "./MetricAlertFields.vue";
-import type { NotificationRule } from "@/types/notifications";
+import type { NotificationRule, UnifiedAlert } from "@/types/notifications";
 
 const props = defineProps<{
   close?: () => void;
   onCreated?: () => void;
-  alert?: NotificationRule;
+  alert?: UnifiedAlert;
   prefill?: { name?: string; containerExpression?: string; logExpression?: string; metricExpression?: string };
 }>();
 
@@ -190,13 +227,37 @@ const fieldsRef = ref<InstanceType<typeof LogAlertFields> | InstanceType<typeof 
 useFocus(alertNameInput, { initialValue: true });
 
 // Alert type
-const alertType = ref<"log" | "metric">(props.alert?.metricExpression ? "metric" : "log");
+const standardAlert = computed<NotificationRule | undefined>(() =>
+  props.alert && props.alert.type !== "scan" ? props.alert : undefined,
+);
+const alertType = ref<"log" | "metric" | "scan">(
+  props.alert?.type === "scan" ? "scan" : standardAlert.value?.metricExpression ? "metric" : "log",
+);
+const scanSeverity = ref(props.alert?.type === "scan" ? props.alert.minSeverity : "HIGH");
+const scanPackageTypes = ref(props.alert?.type === "scan" ? (props.alert.packageTypes ?? []).join(", ") : "");
+const scanCooldownMinutes = ref(props.alert?.type === "scan" ? props.alert.cooldownMinutes || 60 : 60);
 
-const canSave = computed(() => baseCanSave.value && (fieldsRef.value?.canSave ?? false));
+const canSave = computed(() => {
+  if (!baseCanSave.value) return false;
+  if (alertType.value === "scan") return true;
+  return fieldsRef.value?.canSave ?? false;
+});
 
 async function save() {
-  if (!canSave.value || !fieldsRef.value) return;
-  await saveAlert(fieldsRef.value.typeFields);
+  if (!canSave.value) return;
+  if (alertType.value === "scan") {
+    await saveAlert("scan", {
+      minSeverity: scanSeverity.value,
+      packageTypes: scanPackageTypes.value
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean),
+      cooldownMinutes: scanCooldownMinutes.value,
+    });
+    return;
+  }
+  if (!fieldsRef.value) return;
+  await saveAlert(alertType.value, fieldsRef.value.typeFields);
 }
 
 // Container editor

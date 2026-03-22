@@ -8,11 +8,14 @@ export interface Config {
   base: string;
   maxLogs: number;
   hostname: string;
+  appName?: string;
+  appLogoUrl?: string;
   mode: "server" | "swarm" | "k8s";
   hosts: Host[];
   authProvider: "simple" | "none" | "forward-proxy";
   logoutUrl?: string;
   enableActions: boolean;
+  enableContainerScan: boolean;
   enableShell: boolean;
   enableDownload: boolean;
   disableAvatars: boolean;

@@ -3,6 +3,7 @@ toolbar:
   download: Скачать
   download-filtered: Скачать Отфильтрованные Логи
   search: Поиск
+  scan-with-trivy: Сканировать через Trivy
   show: Показать только {std}
   show-all: Показать все потоки
   stop: Остановить
@@ -40,6 +41,13 @@ label:
   created: Создан
   avg-cpu: средний процессор (%)
   avg-mem: средняя память (%)
+  vulnerabilities: Уязвимости
+  scan-report: Отчет сканирования
+  last-scan: Последнее сканирование
+  scanning: Сканирование...
+  scan-not-scanned: Нет сканирования
+  scan-manual: Вручную
+  every-minutes: Каждые {count} мин
   pinned: Закреплено
   per-page: Строк на странице
   host-menu: Хосты и Контейнеры
@@ -55,6 +63,7 @@ tooltip:
 error:
   page-not-found: Эта страница не доступна.
   invalid-auth: Имя пользователя или пароль неверны.
+  unable-to-run-trivy-scan: Не удалось выполнить сканирование Trivy
   copy-not-supported: Копирование в буфер обмена не поддерживается вашим браузером
   copy-not-supported-hint: Буфер обмена недоступен. Скопируйте ссылку ниже
   logs-skipped: Показать {total} скрытых записей
@@ -83,9 +92,33 @@ title:
 button:
   logout: Выйти
   login: Войти
+  refresh: Обновить
   settings: Настройки
   cancel: Отмена
   redirect: Перенаправить
+scan:
+  title: Сканирование Trivy
+  summary-title: Сводка сканирования безопасности
+  scanning-image: Выполняется сканирование образа через Trivy...
+  scheduled: По расписанию
+  interval-minutes: Интервал (мин)
+  last-successful-scan: Последнее успешное сканирование
+  no-saved-scan: Сохранённого результата ещё нет. Запустите сканирование для заполнения данных.
+  no-vulnerabilities: Уязвимости не найдены.
+  critical: Critical
+  high: High
+  medium: Medium
+  low: Low
+  total: Всего
+  scanned: Просканировано
+  running: Выполняется
+  container: Контейнер
+  image: Образ
+  package: Пакет
+  installed: Установлено
+  fixed: Исправлено
+  severity: Severity
+  never: Никогда
 placeholder:
   search-containers: Поиск контейнеров (⌘ + k, ⌃k)
   search: Поиск
@@ -178,6 +211,10 @@ notifications:
     containers: Контейнеры
     log-filter: Фильтр логов
     metric-filter: Метрика
+    scan-severity: Минимальный уровень
+    scan-package-types: Типы пакетов
+    scan-all-package-types: все типы пакетов
+    scan-cooldown-minutes: "{count} мин"
     cooldown: Период ожидания
     sample-window: Окно выборки
     destination: Назначение
@@ -219,6 +256,11 @@ notifications:
     alert-type: Тип оповещения
     log-alert: Оповещение журнала
     metric-alert: Оповещение метрики
+    scan-alert: Оповещение сканирования
+    scan-severity: Минимальный уровень
+    scan-package-types: Типы пакетов
+    scan-package-types-placeholder: напр. os, jar, python-pkg
+    scan-cooldown-hint: "{count} минут между оповещениями сканирования для контейнера"
   destination-form:
     create-title: Добавить Назначение
     edit-title: Редактировать Назначение

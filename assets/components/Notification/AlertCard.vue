@@ -5,7 +5,8 @@
       <div class="flex items-start justify-between">
         <div class="flex items-center gap-2">
           <h4 class="flex items-center gap-2 text-lg font-semibold">
-            <mdi:chart-line v-if="alert.metricExpression" class="text-info" />
+            <mdi:shield-search v-if="alert.type === 'scan'" class="text-info" />
+            <mdi:chart-line v-else-if="alert.type === 'metric'" class="text-info" />
             <mdi:text-box-outline v-else class="text-info" />
             <span>{{ alert.name }}</span> <span class="text-sm font-light">→</span>
             <div class="group/dispatch dropdown dropdown-hover">
@@ -50,7 +51,17 @@
       <div class="text-base-content/80 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
         <span>{{ $t("notifications.alert.containers") }}</span>
         <code class="bg-base-200 text-base-content rounded px-2 py-0.5 font-mono">{{ alert.containerExpression }}</code>
-        <template v-if="alert.metricExpression">
+        <template v-if="alert.type === 'scan'">
+          <span>{{ $t("notifications.alert.scan-severity") }}</span>
+          <code class="bg-base-200 text-base-content rounded px-2 py-0.5 font-mono">{{ alert.minSeverity }}</code>
+          <span>{{ $t("notifications.alert.scan-package-types") }}</span>
+          <code class="bg-base-200 text-base-content rounded px-2 py-0.5 font-mono">
+            {{ alert.packageTypes?.length ? alert.packageTypes.join(", ") : $t("notifications.alert.scan-all-package-types") }}
+          </code>
+          <span>{{ $t("notifications.alert.cooldown") }}</span>
+          <span>{{ $t("notifications.alert.scan-cooldown-minutes", { count: alert.cooldownMinutes || 60 }) }}</span>
+        </template>
+        <template v-else-if="alert.type === 'metric'">
           <span>{{ $t("notifications.alert.metric-filter") }}</span>
           <code class="bg-base-200 text-base-content rounded px-2 py-0.5 font-mono">{{ alert.metricExpression }}</code>
           <span>{{ $t("notifications.alert.sample-window") }}</span>
@@ -92,11 +103,11 @@
 </template>
 
 <script lang="ts" setup>
-import type { Dispatcher, NotificationRule } from "@/types/notifications";
+import type { Dispatcher, UnifiedAlert } from "@/types/notifications";
 import AlertForm from "./AlertForm.vue";
 
 const { alert, onUpdated } = defineProps<{
-  alert: NotificationRule;
+  alert: UnifiedAlert;
   onUpdated?: () => void;
 }>();
 
@@ -110,10 +121,13 @@ onMounted(async () => {
 });
 
 async function changeDispatcher(id: number) {
-  await fetch(withBase(`/api/notifications/rules/${alert.id}`), {
-    method: "PATCH",
+  const url =
+    alert.type === "scan" ? withBase(`/api/scans/alerts/${alert.id}`) : withBase(`/api/notifications/rules/${alert.id}`);
+  const method = alert.type === "scan" ? "PUT" : "PATCH";
+  await fetch(url, {
+    method,
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ dispatcherId: id }),
+    body: JSON.stringify(alert.type === "scan" ? { ...alert, dispatcherId: id } : { dispatcherId: id }),
   });
   onUpdated?.();
 }
@@ -125,10 +139,13 @@ function formatTimeAgo(dateStr: string): string {
 }
 
 async function toggleEnabled() {
-  await fetch(withBase(`/api/notifications/rules/${alert.id}`), {
-    method: "PATCH",
+  const url =
+    alert.type === "scan" ? withBase(`/api/scans/alerts/${alert.id}`) : withBase(`/api/notifications/rules/${alert.id}`);
+  const method = alert.type === "scan" ? "PUT" : "PATCH";
+  await fetch(url, {
+    method,
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ enabled: !alert.enabled }),
+    body: JSON.stringify(alert.type === "scan" ? { ...alert, enabled: !alert.enabled } : { enabled: !alert.enabled }),
   });
   onUpdated?.();
 }
@@ -140,7 +157,11 @@ function editAlert() {
 async function deleteAlert() {
   isDeleting.value = true;
   try {
-    await fetch(withBase(`/api/notifications/rules/${alert.id}`), { method: "DELETE" });
+    const url =
+      alert.type === "scan"
+        ? withBase(`/api/scans/alerts/${alert.id}`)
+        : withBase(`/api/notifications/rules/${alert.id}`);
+    await fetch(url, { method: "DELETE" });
     onUpdated?.();
   } finally {
     isDeleting.value = false;

@@ -1,5 +1,6 @@
 export interface NotificationRule {
   id: number;
+  type?: "log" | "metric";
   name: string;
   enabled: boolean;
   containerExpression: string;
@@ -12,6 +13,27 @@ export interface NotificationRule {
   lastTriggeredAt: string | null;
   dispatcher: Dispatcher | null;
 }
+
+export interface UnifiedAlertBase {
+  id: number;
+  name: string;
+  enabled: boolean;
+  containerExpression: string;
+  triggerCount: number;
+  lastTriggeredAt: string | null;
+  dispatcher: Dispatcher | null;
+}
+
+export interface ScanAlert extends UnifiedAlertBase {
+  type: "scan";
+  dispatcherId: number;
+  minSeverity: string;
+  packageTypes?: string[];
+  cooldownMinutes?: number;
+  triggeredContainers: number;
+}
+
+export type UnifiedAlert = NotificationRule | ScanAlert;
 
 export interface Dispatcher {
   id: number;

@@ -71,6 +71,10 @@ func (m *MockedClient) SystemInfo() system.Info {
 }
 
 func createHandler(client container.Client, content fs.FS, config Config) *chi.Mux {
+	return createHandlerWithScanner(client, content, config, nil)
+}
+
+func createHandlerWithScanner(client container.Client, content fs.FS, config Config, scanner TrivyScanner) *chi.Mux {
 	if client == nil {
 		client = new(MockedClient)
 		client.(*MockedClient).On("ListContainers", mock.Anything, mock.Anything).Return([]container.Container{}, nil)
@@ -89,9 +93,10 @@ func createHandler(client container.Client, content fs.FS, config Config) *chi.M
 	manager := docker_support.NewRetriableClientManager(nil, 3*time.Second, tls.Certificate{}, docker_support.NewDockerClientService(client, container.ContainerLabels{}))
 	multiHostService := docker_support.NewMultiHostService(manager, 3*time.Second)
 	return createRouter(&handler{
-		hostService: multiHostService,
-		content:     content,
-		config:      &config,
+		hostService:  multiHostService,
+		content:      content,
+		config:       &config,
+		trivyScanner: scanner,
 	})
 }
 

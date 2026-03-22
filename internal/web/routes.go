@@ -13,6 +13,7 @@ import (
 	"github.com/amir20/dozzle/internal/notification"
 	"github.com/amir20/dozzle/internal/notification/dispatcher"
 	container_support "github.com/amir20/dozzle/internal/support/container"
+	"github.com/amir20/dozzle/internal/trivy"
 	"github.com/amir20/dozzle/types"
 
 	"github.com/go-chi/chi/v5"
@@ -37,19 +38,24 @@ const (
 
 // Config is a struct for configuring the web service
 type Config struct {
-	Base             string
-	Addr             string
-	Version          string
-	Hostname         string
-	NoAnalytics      bool
-	Dev              bool
-	Mode             string
-	Authorization    Authorization
-	EnableActions    bool
-	EnableShell      bool
-	DisableAvatars   bool
-	ReleaseCheckMode ReleaseCheckMode
-	Labels           container.ContainerLabels
+	Base                string
+	Addr                string
+	Version             string
+	Hostname            string
+	AppName             string
+	AppLogoURL          string
+	NoAnalytics         bool
+	Dev                 bool
+	Mode                string
+	Authorization       Authorization
+	EnableActions       bool
+	EnableContainerScan bool
+	TrivyPath           string
+	ScanManager         ScanManager
+	EnableShell         bool
+	DisableAvatars      bool
+	ReleaseCheckMode    ReleaseCheckMode
+	Labels              container.ContainerLabels
 }
 
 type Authorization struct {
@@ -90,9 +96,11 @@ type HostService interface {
 }
 
 type handler struct {
-	content     fs.FS
-	config      *Config
-	hostService HostService
+	content      fs.FS
+	config       *Config
+	hostService  HostService
+	trivyScanner TrivyScanner
+	scanManager  ScanManager
 }
 
 func CreateServer(hostService HostService, content fs.FS, config Config) *http.Server {
@@ -100,6 +108,10 @@ func CreateServer(hostService HostService, content fs.FS, config Config) *http.S
 		content:     content,
 		config:      &config,
 		hostService: hostService,
+		scanManager: config.ScanManager,
+	}
+	if config.EnableContainerScan {
+		handler.trivyScanner = trivy.NewScanner(config.TrivyPath)
 	}
 
 	return &http.Server{Addr: config.Addr, Handler: createRouter(handler)}
@@ -145,6 +157,17 @@ func createRouter(h *handler) *chi.Mux {
 				// Action
 				if h.config.EnableActions {
 					r.Post("/hosts/{host}/containers/{id}/actions/{action}", h.containerActions)
+				}
+				if h.config.EnableContainerScan {
+					r.Post("/hosts/{host}/containers/{id}/scan", h.scanContainer)
+					r.Get("/hosts/{host}/containers/{id}/scan", h.getContainerScan)
+					r.Post("/hosts/{host}/containers/{id}/scan/run", h.runContainerScan)
+					r.Patch("/hosts/{host}/containers/{id}/scan/schedule", h.updateContainerScanSchedule)
+					r.Get("/scans/summary", h.getScanSummary)
+					r.Get("/scans/alerts", h.listScanAlerts)
+					r.Post("/scans/alerts", h.createScanAlert)
+					r.Put("/scans/alerts/{id}", h.updateScanAlert)
+					r.Delete("/scans/alerts/{id}", h.deleteScanAlert)
 				}
 				if h.config.EnableShell {
 					r.Get("/hosts/{host}/containers/{id}/attach", h.attach)

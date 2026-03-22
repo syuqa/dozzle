@@ -52,12 +52,27 @@ RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache
 
 RUN mkdir /data
 
+FROM --platform=$BUILDPLATFORM aquasec/trivy:0.67.2 AS trivy
+
+ENV TRIVY_CACHE_DIR=/tmp/trivy-cache
+ENV TRIVY_DB_REPOSITORY=ghcr.io/aquasecurity/trivy-db,public.ecr.aws/aquasecurity/trivy-db
+ENV TRIVY_JAVA_DB_REPOSITORY=ghcr.io/aquasecurity/trivy-java-db,public.ecr.aws/aquasecurity/trivy-java-db
+
+RUN trivy image --download-db-only --no-progress
+
 FROM scratch
+
+ENV PATH=/usr/local/bin
+ENV TRIVY_CACHE_DIR=/tmp/trivy-cache
+ENV TRIVY_DB_REPOSITORY="ghcr.io/aquasecurity/trivy-db,public.ecr.aws/aquasecurity/trivy-db"
+ENV TRIVY_JAVA_DB_REPOSITORY="ghcr.io/aquasecurity/trivy-java-db,public.ecr.aws/aquasecurity/trivy-java-db"
 
 COPY --from=builder /data /data
 COPY --from=builder /tmp /tmp
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 COPY --from=builder /dozzle/dozzle /dozzle
+COPY --from=trivy /usr/local/bin/trivy /usr/local/bin/trivy
+COPY --from=trivy /tmp/trivy-cache /tmp/trivy-cache
 
 EXPOSE 8080
 

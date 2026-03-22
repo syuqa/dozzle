@@ -156,6 +156,16 @@
         </li>
       </template>
 
+      <template v-if="enableContainerScan && !historical">
+        <li class="line"></li>
+        <li>
+          <a @click="showDrawer(ContainerTrivyScan, { container }, 'lg')">
+            <mdi:shield-search />
+            {{ $t("toolbar.scan-with-trivy") }}
+          </a>
+        </li>
+      </template>
+
       <template v-if="enableShell && !historical">
         <li class="line"></li>
         <li>
@@ -182,9 +192,10 @@ import { Container } from "@/models/Container";
 import { allLevels } from "@/composable/logContext";
 import LogAnalytics from "../LogViewer/LogAnalytics.vue";
 import Terminal from "@/components/Terminal.vue";
+import ContainerTrivyScan from "./ContainerTrivyScan.vue";
 
 const { showSearch } = useSearchFilter();
-const { enableActions, enableShell, enableDownload } = config;
+const { enableActions, enableContainerScan, enableShell, enableDownload } = config;
 const { streamConfig, hasComplexLogs, levels } = useLoggingContext();
 const showDrawer = useDrawer();
 

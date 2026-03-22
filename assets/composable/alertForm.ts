@@ -1,12 +1,12 @@
 import { Container } from "@/models/Container";
 import type { ContainerJson } from "@/types/Container";
-import type { Dispatcher, NotificationRule, PreviewResult } from "@/types/notifications";
+import type { Dispatcher, PreviewResult, UnifiedAlert } from "@/types/notifications";
 import { createExprEditor, createContainerHints } from "@/composable/exprEditor";
 
 export interface AlertFormOptions {
   close?: () => void;
   onCreated?: () => void;
-  alert?: NotificationRule;
+  alert?: UnifiedAlert;
   prefill?: { name?: string; containerExpression?: string; logExpression?: string; metricExpression?: string };
 }
 
@@ -16,10 +16,12 @@ export interface ContainerResult {
 }
 
 export function useAlertForm(options: AlertFormOptions) {
+  const existingDispatcherId =
+    options.alert && "dispatcherId" in options.alert ? options.alert.dispatcherId : undefined;
   const isEditing = computed(() => !!options.alert);
   const alertName = ref(options.alert?.name ?? options.prefill?.name ?? "");
   const containerExpression = ref(options.alert?.containerExpression ?? options.prefill?.containerExpression ?? "");
-  const dispatcherId = ref(options.alert?.dispatcher?.id ?? 0);
+  const dispatcherId = ref(options.alert?.dispatcher?.id ?? existingDispatcherId ?? 0);
   const isSaving = ref(false);
   const saveError = ref<string | null>(null);
 
@@ -63,7 +65,7 @@ export function useAlertForm(options: AlertFormOptions) {
     });
   }
 
-  async function saveAlert(typeSpecificFields: Record<string, unknown>) {
+  async function saveAlert(kind: "log" | "metric" | "scan", typeSpecificFields: Record<string, unknown>) {
     isSaving.value = true;
     saveError.value = null;
     try {
@@ -71,12 +73,17 @@ export function useAlertForm(options: AlertFormOptions) {
         name: alertName.value.trim(),
         containerExpression: containerExpression.value,
         dispatcherId: dispatcherId.value,
-        enabled: true,
+        enabled: options.alert?.enabled ?? true,
         ...typeSpecificFields,
       };
-      const url = isEditing.value
-        ? withBase(`/api/notifications/rules/${options.alert!.id}`)
-        : withBase("/api/notifications/rules");
+      const isScanAlert = kind === "scan";
+      const url = isScanAlert
+        ? isEditing.value
+          ? withBase(`/api/scans/alerts/${options.alert!.id}`)
+          : withBase("/api/scans/alerts")
+        : isEditing.value
+          ? withBase(`/api/notifications/rules/${options.alert!.id}`)
+          : withBase("/api/notifications/rules");
       const res = await fetch(url, {
         method: isEditing.value ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },

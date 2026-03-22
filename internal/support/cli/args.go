@@ -11,37 +11,41 @@ import (
 var Version = "head"
 
 type Args struct {
-	Addr             string              `arg:"env:DOZZLE_ADDR" default:":8080" help:"sets host:port to bind for server. This is rarely needed inside a docker container."`
-	Base             string              `arg:"env:DOZZLE_BASE" default:"/" help:"sets the base for http router."`
-	Hostname         string              `arg:"env:DOZZLE_HOSTNAME" help:"sets the hostname for display. This is useful with multiple Dozzle instances."`
-	Level            string              `arg:"env:DOZZLE_LEVEL" default:"info" help:"set Dozzle log level. Use debug for more logging."`
-	AuthProvider     string              `arg:"--auth-provider,env:DOZZLE_AUTH_PROVIDER" default:"none" help:"sets the auth provider to use. Currently only forward-proxy is supported."`
-	AuthTTL          string              `arg:"--auth-ttl,env:DOZZLE_AUTH_TTL" default:"session" help:"sets the TTL for the auth token. Accepts duration values like 12h. Valid time units are s, m, h"`
-	AuthHeaderUser   string              `arg:"--auth-header-user,env:DOZZLE_AUTH_HEADER_USER" default:"Remote-User" help:"sets the HTTP Header to use for username in Forward Proxy configuration."`
-	AuthHeaderEmail  string              `arg:"--auth-header-email,env:DOZZLE_AUTH_HEADER_EMAIL" default:"Remote-Email" help:"sets the HTTP Header to use for email in Forward Proxy configuration."`
-	AuthHeaderName   string              `arg:"--auth-header-name,env:DOZZLE_AUTH_HEADER_NAME" default:"Remote-Name" help:"sets the HTTP Header to use for name in Forward Proxy configuration."`
-	AuthHeaderFilter string              `arg:"--auth-header-filter,env:DOZZLE_AUTH_HEADER_FILTER" default:"Remote-Filter" help:"sets the HTTP Header to use for filtering in Forward Proxy configuration."`
-	AuthHeaderRoles  string              `arg:"--auth-header-roles,env:DOZZLE_AUTH_HEADER_ROLES" default:"Remote-Roles" help:"sets the HTTP Header to use for roles in Forward Proxy configuration."`
-	AuthLogoutUrl    string              `arg:"--auth-logout-url,env:DOZZLE_AUTH_LOGOUT_URL" help:"sets the Logout URL used with Forward Proxy."`
-	EnableActions    bool                `arg:"--enable-actions,env:DOZZLE_ENABLE_ACTIONS" default:"false" help:"enables essential actions on containers from the web interface."`
-	EnableShell      bool                `arg:"--enable-shell,env:DOZZLE_ENABLE_SHELL" default:"false" help:"enables shell access to containers from the web interface."`
-	DisableAvatars   bool                `arg:"--disable-avatars,env:DOZZLE_DISABLE_AVATARS" default:"false" help:"disables avatars for authenticated users."`
-	FilterStrings    []string            `arg:"env:DOZZLE_FILTER,--filter,separate" help:"filters docker containers using Docker syntax."`
-	Filter           map[string][]string `arg:"-"`
-	ReleaseCheckMode string              `arg:"--release-check-mode,env:DOZZLE_RELEASE_CHECK_MODE" default:"automatic" help:"sets the release check mode. When manual, releases will not be automatically fetched."`
-	RemoteHost       []string            `arg:"env:DOZZLE_REMOTE_HOST,--remote-host,separate" help:"list of hosts to connect remotely"`
-	RemoteAgent      []string            `arg:"env:DOZZLE_REMOTE_AGENT,--remote-agent,separate" help:"list of agents to connect remotely"`
-	NoAnalytics      bool                `arg:"--no-analytics,env:DOZZLE_NO_ANALYTICS" help:"disables anonymous analytics"`
-	Mode             string              `arg:"env:DOZZLE_MODE" default:"server" help:"sets the mode to run in (server, swarm)"`
-	TimeoutString    string              `arg:"--timeout,env:DOZZLE_TIMEOUT" default:"10s" help:"sets the timeout for docker client"`
-	Timeout          time.Duration       `arg:"-"`
-	Namespace        []string            `arg:"env:DOZZLE_NAMESPACE" help:"sets the namespace to use in k8s"`
-	CertPath         string              `arg:"--cert,env:DOZZLE_CERT" default:"dozzle_cert.pem" help:"path to custom TLS certificate"`
-	KeyPath          string              `arg:"--key,env:DOZZLE_KEY" default:"dozzle_key.pem" help:"path to custom TLS key"`
-	Healthcheck      *HealthcheckCmd     `arg:"subcommand:healthcheck" help:"checks if the server is running"`
-	Generate         *GenerateCmd        `arg:"subcommand:generate" help:"generates a configuration file for simple auth"`
-	Agent            *AgentCmd           `arg:"subcommand:agent" help:"starts the agent"`
-	AgentTest        *AgentTestCmd       `arg:"subcommand:agent-test" help:"tests an agent"`
+	Addr                string              `arg:"env:DOZZLE_ADDR" default:":8080" help:"sets host:port to bind for server. This is rarely needed inside a docker container."`
+	Base                string              `arg:"env:DOZZLE_BASE" default:"/" help:"sets the base for http router."`
+	Hostname            string              `arg:"env:DOZZLE_HOSTNAME" help:"sets the hostname for display. This is useful with multiple Dozzle instances."`
+	AppName             string              `arg:"env:DOZZLE_APP_NAME" help:"sets a custom application name in the web interface."`
+	AppLogoURL          string              `arg:"env:DOZZLE_APP_LOGO_URL" help:"sets a custom application logo URL in the web interface."`
+	Level               string              `arg:"env:DOZZLE_LEVEL" default:"info" help:"set Dozzle log level. Use debug for more logging."`
+	AuthProvider        string              `arg:"--auth-provider,env:DOZZLE_AUTH_PROVIDER" default:"none" help:"sets the auth provider to use. Currently only forward-proxy is supported."`
+	AuthTTL             string              `arg:"--auth-ttl,env:DOZZLE_AUTH_TTL" default:"session" help:"sets the TTL for the auth token. Accepts duration values like 12h. Valid time units are s, m, h"`
+	AuthHeaderUser      string              `arg:"--auth-header-user,env:DOZZLE_AUTH_HEADER_USER" default:"Remote-User" help:"sets the HTTP Header to use for username in Forward Proxy configuration."`
+	AuthHeaderEmail     string              `arg:"--auth-header-email,env:DOZZLE_AUTH_HEADER_EMAIL" default:"Remote-Email" help:"sets the HTTP Header to use for email in Forward Proxy configuration."`
+	AuthHeaderName      string              `arg:"--auth-header-name,env:DOZZLE_AUTH_HEADER_NAME" default:"Remote-Name" help:"sets the HTTP Header to use for name in Forward Proxy configuration."`
+	AuthHeaderFilter    string              `arg:"--auth-header-filter,env:DOZZLE_AUTH_HEADER_FILTER" default:"Remote-Filter" help:"sets the HTTP Header to use for filtering in Forward Proxy configuration."`
+	AuthHeaderRoles     string              `arg:"--auth-header-roles,env:DOZZLE_AUTH_HEADER_ROLES" default:"Remote-Roles" help:"sets the HTTP Header to use for roles in Forward Proxy configuration."`
+	AuthLogoutUrl       string              `arg:"--auth-logout-url,env:DOZZLE_AUTH_LOGOUT_URL" help:"sets the Logout URL used with Forward Proxy."`
+	EnableActions       bool                `arg:"--enable-actions,env:DOZZLE_ENABLE_ACTIONS" default:"false" help:"enables essential actions on containers from the web interface."`
+	EnableContainerScan bool                `arg:"--enable-container-scan,env:DOZZLE_ENABLE_CONTAINER_SCAN" default:"false" help:"enables Trivy vulnerability scans for container images from the web interface."`
+	EnableShell         bool                `arg:"--enable-shell,env:DOZZLE_ENABLE_SHELL" default:"false" help:"enables shell access to containers from the web interface."`
+	DisableAvatars      bool                `arg:"--disable-avatars,env:DOZZLE_DISABLE_AVATARS" default:"false" help:"disables avatars for authenticated users."`
+	FilterStrings       []string            `arg:"env:DOZZLE_FILTER,--filter,separate" help:"filters docker containers using Docker syntax."`
+	Filter              map[string][]string `arg:"-"`
+	ReleaseCheckMode    string              `arg:"--release-check-mode,env:DOZZLE_RELEASE_CHECK_MODE" default:"automatic" help:"sets the release check mode. When manual, releases will not be automatically fetched."`
+	RemoteHost          []string            `arg:"env:DOZZLE_REMOTE_HOST,--remote-host,separate" help:"list of hosts to connect remotely"`
+	RemoteAgent         []string            `arg:"env:DOZZLE_REMOTE_AGENT,--remote-agent,separate" help:"list of agents to connect remotely"`
+	NoAnalytics         bool                `arg:"--no-analytics,env:DOZZLE_NO_ANALYTICS" help:"disables anonymous analytics"`
+	Mode                string              `arg:"env:DOZZLE_MODE" default:"server" help:"sets the mode to run in (server, swarm)"`
+	TrivyPath           string              `arg:"--trivy-path,env:DOZZLE_TRIVY_PATH" default:"trivy" help:"path to the trivy binary used for vulnerability scans"`
+	TimeoutString       string              `arg:"--timeout,env:DOZZLE_TIMEOUT" default:"10s" help:"sets the timeout for docker client"`
+	Timeout             time.Duration       `arg:"-"`
+	Namespace           []string            `arg:"env:DOZZLE_NAMESPACE" help:"sets the namespace to use in k8s"`
+	CertPath            string              `arg:"--cert,env:DOZZLE_CERT" default:"dozzle_cert.pem" help:"path to custom TLS certificate"`
+	KeyPath             string              `arg:"--key,env:DOZZLE_KEY" default:"dozzle_key.pem" help:"path to custom TLS key"`
+	Healthcheck         *HealthcheckCmd     `arg:"subcommand:healthcheck" help:"checks if the server is running"`
+	Generate            *GenerateCmd        `arg:"subcommand:generate" help:"generates a configuration file for simple auth"`
+	Agent               *AgentCmd           `arg:"subcommand:agent" help:"starts the agent"`
+	AgentTest           *AgentTestCmd       `arg:"subcommand:agent-test" help:"tests an agent"`
 }
 
 type Runnable interface {

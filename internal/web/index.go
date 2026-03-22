@@ -69,17 +69,21 @@ func (h *handler) executeTemplate(w http.ResponseWriter, req *http.Request) {
 		config["authProvider"] = h.config.Authorization.Provider
 		config["version"] = h.config.Version
 		config["hostname"] = h.config.Hostname
+		config["appName"] = h.config.AppName
+		config["appLogoUrl"] = h.config.AppLogoURL
 		config["mode"] = h.config.Mode
 		config["hosts"] = hosts
 		config["disableAvatars"] = h.config.DisableAvatars
 		config["releaseCheckMode"] = h.config.ReleaseCheckMode
 		config["enableShell"] = h.config.EnableShell
 		config["enableActions"] = h.config.EnableActions
+		config["enableContainerScan"] = h.config.EnableContainerScan
 		config["enableDownload"] = true
 
 		if user != nil {
 			config["enableShell"] = h.config.EnableShell && user.Roles.Has(auth.Shell)
 			config["enableActions"] = h.config.EnableActions && user.Roles.Has(auth.Actions)
+			config["enableContainerScan"] = h.config.EnableContainerScan && user.Roles.Has(auth.Actions)
 			config["enableDownload"] = user.Roles.Has(auth.Download)
 			config["user"] = user
 		}
