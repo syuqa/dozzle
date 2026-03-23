@@ -62,6 +62,7 @@ type ContainerScanState struct {
 	Container      ContainerRef  `json:"container"`
 	Summary        trivy.Summary `json:"summary"`
 	Result         *trivy.Result `json:"result,omitempty"`
+	ScanLog        []string      `json:"scanLog,omitempty"`
 	LastStartedAt  *time.Time    `json:"lastStartedAt,omitempty"`
 	LastFinishedAt *time.Time    `json:"lastFinishedAt,omitempty"`
 	LastSuccessAt  *time.Time    `json:"lastSuccessAt,omitempty"`
@@ -106,6 +107,8 @@ type ScanAlert struct {
 	NotifyOnManual      *bool      `json:"notifyOnManual,omitempty"`
 	TriggerCount        int64      `json:"triggerCount"`
 	LastTriggeredAt     *time.Time `json:"lastTriggeredAt,omitempty"`
+	LastDispatchAt      *time.Time `json:"lastDispatchAt,omitempty"`
+	LastDispatchError   string     `json:"lastDispatchError,omitempty"`
 
 	ContainerProgram *vm.Program `json:"-" yaml:"-"`
 }
@@ -238,6 +241,7 @@ func cloneState(in *ContainerScanState) *ContainerScanState {
 	}
 	out.PackageTypes = append([]string(nil), in.PackageTypes...)
 	out.Severities = append([]string(nil), in.Severities...)
+	out.ScanLog = append([]string(nil), in.ScanLog...)
 	return &out
 }
 
@@ -607,6 +611,7 @@ func (m *Manager) runScan(ctx context.Context, host, id string, force bool, trig
 	}
 	now := time.Now().UTC()
 	state.Running = true
+	state.ScanLog = nil
 	state.LastStartedAt = &now
 	_ = m.saveLocked()
 	m.mu.Unlock()
@@ -640,6 +645,7 @@ func (m *Manager) runScan(ctx context.Context, host, id string, force bool, trig
 
 func (m *Manager) executeScan(ctx context.Context, host string, containerService *container_support.ContainerService) (*trivy.Result, error) {
 	if m.isAgentHost(host) {
+		m.appendScanLog(scanKey(host, containerService.Container.ID), "Running scan on agent")
 		result, err := containerService.RunScan(ctx)
 		if err == nil {
 			return result, nil
@@ -649,7 +655,36 @@ func (m *Manager) executeScan(ctx context.Context, host string, containerService
 		}
 	}
 
+	if progressScanner, ok := m.scanner.(interface {
+		ScanImageWithProgress(context.Context, string, func(string)) (*trivy.Result, error)
+	}); ok {
+		return progressScanner.ScanImageWithProgress(ctx, containerService.Container.Image, func(line string) {
+			m.appendScanLog(scanKey(host, containerService.Container.ID), line)
+		})
+	}
+
 	return m.scanner.ScanImage(ctx, containerService.Container.Image)
+}
+
+func (m *Manager) appendScanLog(key, line string) {
+	line = strings.TrimSpace(line)
+	if line == "" {
+		return
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	state := m.state.Scans[key]
+	if state == nil {
+		return
+	}
+	if len(state.ScanLog) > 0 && state.ScanLog[len(state.ScanLog)-1] == line {
+		return
+	}
+	state.ScanLog = append(state.ScanLog, line)
+	if len(state.ScanLog) > 200 {
+		state.ScanLog = append([]string(nil), state.ScanLog[len(state.ScanLog)-200:]...)
+	}
 }
 
 func (m *Manager) isAgentHost(hostID string) bool {
@@ -748,6 +783,7 @@ func (m *Manager) matchingAlertsLocked(c container.Container, result *trivy.Resu
 		}
 		now := time.Now().UTC()
 		alert.LastTriggeredAt = &now
+		alert.LastDispatchError = ""
 		alert.TriggerCount++
 		matched = append(matched, alert)
 	}
@@ -802,9 +838,7 @@ func (m *Manager) dispatchAlerts(ctx context.Context, state *ContainerScanState,
 		notificationPayload := types.Notification{
 			ID:        fmt.Sprintf("scan-%s-%d", state.Container.ID, time.Now().Unix()),
 			Type:      types.ScanNotification,
-			Detail:    fmt.Sprintf("Trivy scan found %d vulnerabilities in %s (%d critical, %d high, %d medium, %d low)", state.Summary.Total, state.Container.Image, state.Summary.Critical, state.Summary.High, state.Summary.Medium, state.Summary.Low),
 			Container: types.NotificationContainer{ID: state.Container.ID, Name: state.Container.Name, Image: state.Container.Image, HostID: state.Container.Host, HostName: state.Container.Host},
-			Scan:      buildScanNotification(state.Result),
 			Subscription: types.SubscriptionConfig{
 				ID:                  alert.ID,
 				Name:                alert.Name,
@@ -812,34 +846,92 @@ func (m *Manager) dispatchAlerts(ctx context.Context, state *ContainerScanState,
 			},
 			Timestamp: time.Now().UTC(),
 		}
-		if err := d.Send(ctx, notificationPayload); err != nil {
-			log.Warn().Err(err).Str("alert", alert.Name).Msg("scan alert dispatch failed")
+		notificationPayload.Scan = buildScanNotification(alert, state.Result)
+		if notificationPayload.Scan != nil {
+			notificationPayload.Detail = fmt.Sprintf(
+				"Trivy scan matched %d vulnerabilities in %s (%d critical, %d high, %d medium, %d low)",
+				notificationPayload.Scan.Summary.Total,
+				state.Container.Image,
+				notificationPayload.Scan.Summary.Critical,
+				notificationPayload.Scan.Summary.High,
+				notificationPayload.Scan.Summary.Medium,
+				notificationPayload.Scan.Summary.Low,
+			)
 		}
+		now := time.Now().UTC()
+		alert.LastDispatchAt = &now
+		if err := d.Send(ctx, notificationPayload); err != nil {
+			alert.LastDispatchError = err.Error()
+			m.persistDispatchMeta(alert)
+			log.Warn().Err(err).Str("alert", alert.Name).Msg("scan alert dispatch failed")
+			continue
+		}
+		alert.LastDispatchError = ""
+		m.persistDispatchMeta(alert)
 	}
 }
 
-func buildScanNotification(result *trivy.Result) *types.NotificationScan {
-	if result == nil {
+func (m *Manager) persistDispatchMeta(alert *ScanAlert) {
+	if alert == nil {
+		return
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, existing := range m.state.Alerts {
+		if existing.ID != alert.ID {
+			continue
+		}
+		existing.LastDispatchAt = alert.LastDispatchAt
+		existing.LastDispatchError = alert.LastDispatchError
+		_ = m.saveLocked()
+		return
+	}
+}
+
+func buildScanNotification(alert *ScanAlert, result *trivy.Result) *types.NotificationScan {
+	if alert == nil || result == nil {
 		return nil
 	}
 
-	scanNotification := &types.NotificationScan{
-		Image:       result.Image,
-		GeneratedAt: result.GeneratedAt,
-		Summary: types.NotificationScanSummary{
-			Critical: result.Summary.Critical,
-			High:     result.Summary.High,
-			Medium:   result.Summary.Medium,
-			Low:      result.Summary.Low,
-			Unknown:  result.Summary.Unknown,
-			Total:    result.Summary.Total,
-		},
-		PackageTypes:    packageTypesFromResult(result),
-		Vulnerabilities: make([]types.NotificationScanVulnerability, 0),
+	minRank := severityRank(string(alert.MinSeverity))
+	typeSet := make(map[string]struct{}, len(alert.PackageTypes))
+	for _, t := range alert.PackageTypes {
+		typeSet[strings.ToLower(t)] = struct{}{}
 	}
 
+	scanNotification := &types.NotificationScan{
+		Image:           result.Image,
+		GeneratedAt:     result.GeneratedAt,
+		PackageTypes:    make([]string, 0),
+		Vulnerabilities: make([]types.NotificationScanVulnerability, 0),
+	}
+	packageTypeSeen := map[string]struct{}{}
+
 	for _, item := range result.Results {
+		if len(typeSet) > 0 {
+			if _, ok := typeSet[strings.ToLower(item.Type)]; !ok {
+				continue
+			}
+		}
+		itemMatched := false
 		for _, vuln := range item.Vulnerabilities {
+			if severityRank(vuln.Severity) < minRank {
+				continue
+			}
+			itemMatched = true
+			scanNotification.Summary.Total++
+			switch strings.ToUpper(vuln.Severity) {
+			case "CRITICAL":
+				scanNotification.Summary.Critical++
+			case "HIGH":
+				scanNotification.Summary.High++
+			case "MEDIUM":
+				scanNotification.Summary.Medium++
+			case "LOW":
+				scanNotification.Summary.Low++
+			default:
+				scanNotification.Summary.Unknown++
+			}
 			scanNotification.Vulnerabilities = append(scanNotification.Vulnerabilities, types.NotificationScanVulnerability{
 				ID:               vuln.ID,
 				Severity:         strings.ToUpper(vuln.Severity),
@@ -852,8 +944,15 @@ func buildScanNotification(result *trivy.Result) *types.NotificationScan {
 				FixedVersion:     vuln.FixedVersion,
 			})
 		}
+		if itemMatched && item.Type != "" {
+			if _, ok := packageTypeSeen[item.Type]; !ok {
+				packageTypeSeen[item.Type] = struct{}{}
+				scanNotification.PackageTypes = append(scanNotification.PackageTypes, item.Type)
+			}
+		}
 	}
 
+	slices.Sort(scanNotification.PackageTypes)
 	return scanNotification
 }
 
@@ -965,6 +1064,8 @@ func (m *Manager) UpdateAlert(id int, next *ScanAlert) (*ScanAlert, error) {
 		next.ID = id
 		next.TriggerCount = alert.TriggerCount
 		next.LastTriggeredAt = alert.LastTriggeredAt
+		next.LastDispatchAt = alert.LastDispatchAt
+		next.LastDispatchError = alert.LastDispatchError
 		m.state.Alerts[i] = next
 		if err := m.saveLocked(); err != nil {
 			return nil, err
