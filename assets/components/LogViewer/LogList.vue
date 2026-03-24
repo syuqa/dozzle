@@ -18,11 +18,25 @@ import type { LogEntry, LogMessage } from "@/models/LogEntry";
 
 const { progress, currentDate } = useScrollContext();
 
-const { messages } = defineProps<{
+const props = defineProps<{
   messages: LogEntry<LogMessage>[];
 }>();
+const messages = toRef(() => props.messages);
 
 const { containers } = useLoggingContext();
+const containerStore = useContainerStore();
+const { containers: allContainers } = storeToRefs(containerStore);
+const containersById = computed(() =>
+  allContainers.value.reduce(
+    (acc, container) => {
+      acc[container.id] = container;
+      return acc;
+    },
+    {} as Record<string, import("@/models/Container").Container>,
+  ),
+);
+
+provideLogIncidents(messages, containersById);
 
 const list = ref<HTMLElement[]>([]);
 

@@ -1,11 +1,13 @@
 package trivy
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os/exec"
 	"strings"
 	"time"
@@ -80,18 +82,32 @@ type rawVulnerability struct {
 }
 
 func (s *Scanner) ScanImage(ctx context.Context, image string) (*Result, error) {
+	return s.ScanImageWithProgress(ctx, image, nil)
+}
+
+func (s *Scanner) ScanImageWithProgress(ctx context.Context, image string, onProgress func(string)) (*Result, error) {
 	if strings.TrimSpace(image) == "" {
 		return nil, ErrImageRequired
 	}
 
-	cmd := exec.CommandContext(ctx, s.binary, "image", "--quiet", "--format", "json", "--scanners", "vuln", image)
+	cmd := exec.CommandContext(ctx, s.binary, "image", "--format", "json", "--scanners", "vuln", image)
 	var stdout bytes.Buffer
-	var stderr bytes.Buffer
 	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
 
-	if err := cmd.Run(); err != nil {
-		message := strings.TrimSpace(stderr.String())
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return nil, fmt.Errorf("create trivy stderr pipe: %w", err)
+	}
+
+	var stderrBuffer bytes.Buffer
+	go streamProgress(io.TeeReader(stderr, &stderrBuffer), onProgress)
+
+	if err := cmd.Start(); err != nil {
+		return nil, fmt.Errorf("start trivy scan: %w", err)
+	}
+
+	if err := cmd.Wait(); err != nil {
+		message := strings.TrimSpace(stderrBuffer.String())
 		if message == "" {
 			message = strings.TrimSpace(stdout.String())
 		}
@@ -152,4 +168,28 @@ func (s *Scanner) ScanImage(ctx context.Context, image string) (*Result, error) 
 	}
 
 	return result, nil
+}
+
+func streamProgress(reader io.Reader, onProgress func(string)) {
+	scanner := bufio.NewScanner(reader)
+	scanner.Split(scanProgressLines)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || onProgress == nil {
+			continue
+		}
+		onProgress(line)
+	}
+}
+
+func scanProgressLines(data []byte, atEOF bool) (advance int, token []byte, err error) {
+	for i, b := range data {
+		if b == '\n' || b == '\r' {
+			return i + 1, data[:i], nil
+		}
+	}
+	if atEOF && len(data) > 0 {
+		return len(data), data, nil
+	}
+	return 0, nil, nil
 }

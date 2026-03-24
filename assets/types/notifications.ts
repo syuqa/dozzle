@@ -29,8 +29,13 @@ export interface ScanAlert extends UnifiedAlertBase {
   dispatcherId: number;
   minSeverity: string;
   packageTypes?: string[];
+  scheduleEnabled?: boolean;
+  intervalMinutes?: number;
   cooldownMinutes?: number;
+  notifyOnManual?: boolean;
   triggeredContainers: number;
+  lastDispatchAt?: string | null;
+  lastDispatchError?: string;
 }
 
 export type UnifiedAlert = NotificationRule | ScanAlert;

@@ -97,7 +97,7 @@ func main() {
 		// Create client service for agent server in swarm mode
 		clientService := docker_support.NewDockerClientService(localClient, args.Filter)
 		// TODO add notification for swarm mode
-			server, err := agent.NewServer(clientService, certs, args.Version(), nil, trivy.NewScanner(args.TrivyPath))
+		server, err := agent.NewServer(clientService, certs, args.Version(), nil, trivy.NewScanner(args.TrivyPath))
 		if err != nil {
 			log.Fatal().Err(err).Msg("failed to create agent")
 		}
@@ -223,15 +223,18 @@ func createServer(args cli.Args, hostService web.HostService) *http.Server {
 	}
 
 	config := web.Config{
-		Addr:        args.Addr,
-		Base:        args.Base,
-		Version:     args.Version(),
-		Hostname:    args.Hostname,
-		AppName:     args.AppName,
-		AppLogoURL:  args.AppLogoURL,
-		NoAnalytics: args.NoAnalytics,
-		Dev:         dev,
-		Mode:        args.Mode,
+		Addr:                args.Addr,
+		Base:                args.Base,
+		Version:             args.Version(),
+		Hostname:            args.Hostname,
+		AppName:             args.AppName,
+		AppLogoURL:          args.AppLogoURL,
+		ScanStatusEndpoint:  args.ScanStatusEndpoint,
+		LogIncidentEndpoint: args.LogIncidentEndpoint,
+		LogIncidentDebug:    args.LogIncidentDebug,
+		NoAnalytics:         args.NoAnalytics,
+		Dev:                 dev,
+		Mode:                args.Mode,
 		Authorization: web.Authorization{
 			Provider:   provider,
 			Authorizer: authorizer,

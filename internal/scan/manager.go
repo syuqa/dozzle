@@ -103,6 +103,8 @@ type ScanAlert struct {
 	ContainerExpression string     `json:"containerExpression"`
 	MinSeverity         Severity   `json:"minSeverity"`
 	PackageTypes        []string   `json:"packageTypes,omitempty"`
+	ScheduleEnabled     bool       `json:"scheduleEnabled,omitempty"`
+	IntervalMinutes     int        `json:"intervalMinutes,omitempty"`
 	CooldownMinutes     int        `json:"cooldownMinutes,omitempty"`
 	NotifyOnManual      *bool      `json:"notifyOnManual,omitempty"`
 	TriggerCount        int64      `json:"triggerCount"`
@@ -451,6 +453,7 @@ func compileAlert(alert *ScanAlert) error {
 	if alert.MinSeverity == "" {
 		alert.MinSeverity = SeverityHigh
 	}
+	alert.IntervalMinutes = normalizeInterval(alert.IntervalMinutes)
 	alert.CooldownMinutes = normalizeInterval(alert.CooldownMinutes)
 	slices.Sort(alert.PackageTypes)
 	return nil
@@ -474,14 +477,25 @@ func (m *Manager) Start(ctx context.Context) {
 
 func (m *Manager) runDueScans(ctx context.Context) {
 	m.syncContainers()
+	containers, _ := m.hostService.ListAllContainers(container.ContainerLabels{})
+	hostNames := make(map[string]string, len(m.hostService.Hosts()))
+	for _, host := range m.hostService.Hosts() {
+		hostNames[host.ID] = host.Name
+	}
 
 	m.mu.RLock()
 	candidates := make([]string, 0)
-	for key, state := range m.state.Scans {
-		if !state.Schedule.Enabled || state.Running {
+	for _, c := range containers {
+		key := scanKey(c.Host, c.ID)
+		state := m.state.Scans[key]
+		if state != nil && state.Running {
 			continue
 		}
-		if state.LastFinishedAt == nil || time.Since(*state.LastFinishedAt) >= time.Duration(state.Schedule.IntervalMinutes)*time.Minute {
+		interval, ok := m.scheduledIntervalLocked(c, hostNames[c.Host])
+		if !ok {
+			continue
+		}
+		if state == nil || state.LastFinishedAt == nil || time.Since(*state.LastFinishedAt) >= time.Duration(interval)*time.Minute {
 			candidates = append(candidates, key)
 		}
 	}
@@ -507,6 +521,33 @@ func (m *Manager) GetState(host, id string) *ContainerScanState {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return cloneState(m.state.Scans[scanKey(host, id)])
+}
+
+func (m *Manager) scheduledIntervalLocked(c container.Container, hostName string) (int, bool) {
+	if hostName == "" {
+		hostName = c.Host
+	}
+	notificationContainer := notification.FromContainerModel(c, container.Host{ID: c.Host, Name: hostName})
+	minInterval := 0
+	found := false
+	for _, alert := range m.state.Alerts {
+		if alert == nil || !alert.Enabled || !alert.ScheduleEnabled {
+			continue
+		}
+		match, err := vm.Run(alert.ContainerProgram, notificationContainer)
+		if err != nil {
+			continue
+		}
+		ok, _ := match.(bool)
+		if !ok {
+			continue
+		}
+		if !found || alert.IntervalMinutes < minInterval {
+			minInterval = alert.IntervalMinutes
+			found = true
+		}
+	}
+	return minInterval, found
 }
 
 func (m *Manager) SetSchedule(host, id string, schedule ScanSchedule) (*ContainerScanState, error) {

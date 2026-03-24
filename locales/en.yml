@@ -55,6 +55,7 @@ label:
   swarm-menu: Services and Stacks
   k8s-menu: Kubernetes
   group-menu: Custom Groups
+  incident: Incident
   no-logs: Container has no logs yet
   show-all-containers: Show all containers
   collapse-all: Collapse all
@@ -125,6 +126,15 @@ scan:
   installed: Installed
   fixed: Fixed
   severity: Severity
+  status: Issue Status
+  load-status: GitLab Status
+  unable-to-load-status: Unable to load issue status
+  status-summary-label: "GitLab: CVE {cve}, incidents {incidents}"
+  issue-history-title: Issue History
+  issue-history: History
+  no-history: No issue history available.
+  no-status-issues: No issues found for this container.
+  system: System
   never: Never
 placeholder:
   search-containers: Search containers (⌘ + k, ⌃k)
@@ -223,11 +233,19 @@ notifications:
     scan-severity: Minimum severity
     scan-package-types: Package types
     scan-all-package-types: all package types
+    scan-schedule: Schedule
+    scan-schedule-disabled: manual only
+    scan-interval-minutes: every {count} min
     scan-cooldown-minutes: "{count} min"
+    scan-manual-trigger: Manual scan
+    scan-manual-trigger-enabled: sends alerts
+    scan-manual-trigger-disabled: no alerts
     cooldown: Cooldown
     sample-window: Sample window
     destination: Destination
     dispatcher-deleted: Dispatcher deleted
+    last-dispatch-error: Last delivery error
+    last-dispatch-at: "Delivery attempt: {time}"
     containers-count: "{count} containers"
     triggered-count: "{count} triggered"
     last-triggered: "Last: {time}"
@@ -269,7 +287,12 @@ notifications:
     scan-severity: Minimum severity
     scan-package-types: Package types
     scan-package-types-placeholder: e.g. os, jar, python-pkg
+    scan-schedule-enabled: Run scan on schedule
+    scan-interval-minutes: Scan interval (min)
+    scan-interval-hint: scans will run every {count} minutes for matching containers
     scan-cooldown-hint: "{count} minutes between scan alerts per container"
+    scan-notify-on-manual: Send alert on manual scan
+    scan-notify-on-manual-hint: If disabled, alerts are sent only for scheduled scans
   destination-form:
     create-title: Add Destination
     edit-title: Edit Destination

@@ -125,10 +125,35 @@
       </fieldset>
 
       <fieldset class="fieldset">
+        <label class="label cursor-pointer justify-start gap-3">
+          <input v-model="scanScheduleEnabled" type="checkbox" class="toggle toggle-primary" />
+          <span class="label-text">{{ $t("notifications.alert-form.scan-schedule-enabled") }}</span>
+        </label>
+      </fieldset>
+
+      <fieldset class="fieldset" v-if="scanScheduleEnabled">
+        <legend class="fieldset-legend text-lg">{{ $t("notifications.alert-form.scan-interval-minutes") }}</legend>
+        <input v-model.number="scanIntervalMinutes" type="number" min="5" step="5" class="input w-full" />
+        <p class="text-base-content/50 mt-1 text-xs">
+          {{ $t("notifications.alert-form.scan-interval-hint", { count: scanIntervalMinutes }) }}
+        </p>
+      </fieldset>
+
+      <fieldset class="fieldset">
         <legend class="fieldset-legend text-lg">{{ $t("notifications.alert-form.cooldown-label") }}</legend>
         <input v-model.number="scanCooldownMinutes" type="range" min="5" max="1440" step="5" class="range range-primary" />
         <p class="text-base-content/50 mt-1 text-xs">
           {{ $t("notifications.alert-form.scan-cooldown-hint", { count: scanCooldownMinutes }) }}
+        </p>
+      </fieldset>
+
+      <fieldset class="fieldset">
+        <label class="label cursor-pointer justify-start gap-3">
+          <input v-model="scanNotifyOnManual" type="checkbox" class="toggle toggle-primary" />
+          <span class="label-text">{{ $t("notifications.alert-form.scan-notify-on-manual") }}</span>
+        </label>
+        <p class="text-base-content/50 mt-1 text-xs">
+          {{ $t("notifications.alert-form.scan-notify-on-manual-hint") }}
         </p>
       </fieldset>
     </div>
@@ -235,7 +260,10 @@ const alertType = ref<"log" | "metric" | "scan">(
 );
 const scanSeverity = ref(props.alert?.type === "scan" ? props.alert.minSeverity : "HIGH");
 const scanPackageTypes = ref(props.alert?.type === "scan" ? (props.alert.packageTypes ?? []).join(", ") : "");
+const scanScheduleEnabled = ref(props.alert?.type === "scan" ? props.alert.scheduleEnabled ?? false : false);
+const scanIntervalMinutes = ref(props.alert?.type === "scan" ? props.alert.intervalMinutes || 60 : 60);
 const scanCooldownMinutes = ref(props.alert?.type === "scan" ? props.alert.cooldownMinutes || 60 : 60);
+const scanNotifyOnManual = ref(props.alert?.type === "scan" ? props.alert.notifyOnManual ?? true : true);
 
 const canSave = computed(() => {
   if (!baseCanSave.value) return false;
@@ -252,7 +280,10 @@ async function save() {
         .split(",")
         .map((value) => value.trim())
         .filter(Boolean),
+      scheduleEnabled: scanScheduleEnabled.value,
+      intervalMinutes: scanIntervalMinutes.value,
       cooldownMinutes: scanCooldownMinutes.value,
+      notifyOnManual: scanNotifyOnManual.value,
     });
     return;
   }

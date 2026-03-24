@@ -71,6 +71,9 @@ func (h *handler) executeTemplate(w http.ResponseWriter, req *http.Request) {
 		config["hostname"] = h.config.Hostname
 		config["appName"] = h.config.AppName
 		config["appLogoUrl"] = h.config.AppLogoURL
+		config["enableScanStatus"] = strings.TrimSpace(h.config.ScanStatusEndpoint) != ""
+		config["enableLogIncidentMatch"] = strings.TrimSpace(h.config.LogIncidentEndpoint) != ""
+		config["enableLogIncidentDebug"] = h.config.LogIncidentDebug
 		config["mode"] = h.config.Mode
 		config["hosts"] = hosts
 		config["disableAvatars"] = h.config.DisableAvatars

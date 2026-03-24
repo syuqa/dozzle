@@ -190,7 +190,13 @@ func TestManagerMigratesLegacyJSONToSQLite(t *testing.T) {
 	require.NoError(t, file.Close())
 
 	hostService := &stubHostService{
-		containerService: container_support.NewContainerService(&stubClientService{}, container.Container{}),
+		containerService: container_support.NewContainerService(&stubClientService{}, container.Container{
+			ID:    "123",
+			Name:  "api",
+			Image: "private/image:1.0.0",
+			Host:  "agent-1",
+			State: "running",
+		}),
 	}
 	manager, err := NewManager(hostService, &stubScanner{})
 	require.NoError(t, err)

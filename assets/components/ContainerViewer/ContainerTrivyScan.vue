@@ -11,8 +11,13 @@
       </button>
     </div>
 
-    <div class="alert alert-info" v-if="loading">
-      <span>{{ $t("scan.scanning-image") }}</span>
+    <div class="space-y-3" v-if="loading || state?.running">
+      <div class="alert alert-info">
+        <span>{{ $t("scan.scanning-image") }}</span>
+      </div>
+      <div class="stable-scroll bg-base-300 rounded-box text-base-content/80 max-h-56 overflow-auto p-3 font-mono text-xs" v-if="scanLog.length">
+        <pre class="whitespace-pre-wrap break-words">{{ scanLog.join("\n") }}</pre>
+      </div>
     </div>
 
     <div class="alert alert-error" v-else-if="error">
@@ -21,20 +26,6 @@
 
     <template v-else-if="state">
       <div class="flex flex-wrap gap-3">
-        <label class="label cursor-pointer gap-2">
-          <span class="label-text">{{ $t("scan.scheduled") }}</span>
-          <input type="checkbox" class="toggle toggle-sm" v-model="scheduleEnabled" @change="saveSchedule()" />
-        </label>
-        <label class="label gap-2">
-          <span class="label-text">{{ $t("scan.interval-minutes") }}</span>
-          <input
-            type="number"
-            min="5"
-            class="input input-sm w-24"
-            v-model.number="intervalMinutes"
-            @change="saveSchedule()"
-          />
-        </label>
         <div class="text-base-content/70 text-sm self-center" v-if="state.lastSuccessAt">
           {{ $t("scan.last-successful-scan") }}: <RelativeTime :date="new Date(state.lastSuccessAt)" />
         </div>
@@ -71,28 +62,32 @@
       <div class="stats stats-vertical md:stats-horizontal bg-base-200 w-full shadow-sm" v-else>
         <div class="stat">
           <div class="stat-title">{{ $t("scan.critical") }}</div>
-          <div class="stat-value text-error">{{ result.summary.critical }}</div>
+          <div class="stat-value text-error">{{ filteredSummary.critical }}</div>
         </div>
         <div class="stat">
           <div class="stat-title">{{ $t("scan.high") }}</div>
-          <div class="stat-value text-warning">{{ result.summary.high }}</div>
+          <div class="stat-value text-warning">{{ filteredSummary.high }}</div>
         </div>
         <div class="stat">
           <div class="stat-title">{{ $t("scan.medium") }}</div>
-          <div class="stat-value text-info">{{ result.summary.medium }}</div>
+          <div class="stat-value text-info">{{ filteredSummary.medium }}</div>
         </div>
         <div class="stat">
           <div class="stat-title">{{ $t("scan.low") }}</div>
-          <div class="stat-value">{{ result.summary.low }}</div>
+          <div class="stat-value">{{ filteredSummary.low }}</div>
         </div>
         <div class="stat">
           <div class="stat-title">{{ $t("scan.total") }}</div>
-          <div class="stat-value">{{ result.summary.total }}</div>
+          <div class="stat-value">{{ filteredSummary.total }}</div>
         </div>
       </div>
 
-      <div class="alert alert-success" v-if="result && result.summary.total === 0">
+      <div class="alert alert-success" v-if="result && filteredSummary.total === 0">
         <span>{{ $t("scan.no-vulnerabilities") }}</span>
+      </div>
+
+      <div class="alert alert-warning" v-if="statusError">
+        <span>{{ statusError }}</span>
       </div>
 
       <div class="space-y-4" v-for="item in filteredResults" :key="item.target">
@@ -110,6 +105,7 @@
                 <th>{{ $t("scan.installed") }}</th>
                 <th>{{ $t("scan.fixed") }}</th>
                 <th>{{ $t("scan.severity") }}</th>
+                <th v-if="enableScanStatus">{{ $t("scan.status") }}</th>
               </tr>
             </thead>
             <tbody>
@@ -141,6 +137,19 @@
                     {{ vulnerability.severity }}
                   </span>
                 </td>
+                <td v-if="enableScanStatus">
+                  <a
+                    v-if="cveIssueById[vulnerability.id]"
+                    class="badge badge-outline"
+                    :class="statusBadgeClass(cveIssueById[vulnerability.id].status)"
+                    :href="cveIssueById[vulnerability.id].url"
+                    target="_blank"
+                    rel="noreferrer noopener"
+                  >
+                    {{ cveIssueById[vulnerability.id].statusLabel || cveIssueById[vulnerability.id].status }}
+                  </a>
+                  <span class="text-base-content/50" v-else>-</span>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -152,7 +161,7 @@
 
 <script lang="ts" setup>
 import { Container } from "@/models/Container";
-import type { ContainerScanState, ScanTargetResult } from "@/types/scans";
+import type { ContainerScanState, ScanStatusIssue, ScanStatusResponse, ScanSummary, ScanTargetResult } from "@/types/scans";
 
 const { t } = useI18n();
 const { container } = defineProps<{ container: Container }>();
@@ -160,12 +169,15 @@ const { container } = defineProps<{ container: Container }>();
 const loading = ref(false);
 const error = ref("");
 const state = ref<ContainerScanState>();
+const statusSummary = ref<ScanStatusResponse>();
+const statusError = ref("");
+const statusLoading = ref(false);
 const severityFilter = ref<string[]>([]);
 const packageTypeFilter = ref<string[]>([]);
-const scheduleEnabled = ref(false);
-const intervalMinutes = ref(60);
+const enableScanStatus = config.enableScanStatus === true;
 
 const result = computed(() => state.value?.result);
+const scanLog = computed(() => state.value?.scanLog ?? []);
 const availableSeverities = computed(() => state.value?.severities ?? []);
 const availablePackageTypes = computed(() => state.value?.packageTypes ?? []);
 const filteredResults = computed(() => {
@@ -180,45 +192,138 @@ const filteredResults = computed(() => {
     }))
     .filter((item) => item.vulnerabilities.length > 0);
 });
+const filteredSummary = computed<ScanSummary>(() => {
+  return filteredResults.value.reduce<ScanSummary>(
+    (summary, item) => {
+      for (const vulnerability of item.vulnerabilities) {
+        summary.total += 1;
+        if (vulnerability.severity === "CRITICAL") summary.critical += 1;
+        else if (vulnerability.severity === "HIGH") summary.high += 1;
+        else if (vulnerability.severity === "MEDIUM") summary.medium += 1;
+        else if (vulnerability.severity === "LOW") summary.low += 1;
+        else summary.unknown += 1;
+      }
+      return summary;
+    },
+    { critical: 0, high: 0, medium: 0, low: 0, unknown: 0, total: 0 },
+  );
+});
+const cveIssues = computed<ScanStatusIssue[]>(() => [
+  ...(statusSummary.value?.cve?.open ?? []),
+  ...(statusSummary.value?.cve?.resolved ?? []),
+  ...(statusSummary.value?.cve?.falsePositive ?? []),
+]);
+const cveIssueById = computed<Record<string, ScanStatusIssue>>(() =>
+  Object.fromEntries(cveIssues.value.map((issue) => extractCveKeys(issue).map((key) => [key, issue])).flat()),
+);
 
 async function fetchState() {
   const response = await fetch(withBase(`/api/hosts/${container.host}/containers/${container.id}/scan`));
   if (!response.ok) return;
   state.value = await response.json();
-  scheduleEnabled.value = state.value.schedule.enabled;
-  intervalMinutes.value = state.value.schedule.intervalMinutes || 60;
+  if (enableScanStatus && state.value.result && statusSummary.value?.image !== state.value.result.image) {
+    void fetchStatusSummary(false);
+  }
+}
+
+let pollHandle: ReturnType<typeof setInterval> | undefined;
+
+function startPolling() {
+  stopPolling();
+  pollHandle = setInterval(async () => {
+    await fetchState();
+    if (!state.value?.running) {
+      stopPolling();
+      loading.value = false;
+    }
+  }, 1000);
+}
+
+function stopPolling() {
+  if (pollHandle) {
+    clearInterval(pollHandle);
+    pollHandle = undefined;
+  }
 }
 
 async function runScan() {
   loading.value = true;
   error.value = "";
+  statusSummary.value = undefined;
+  statusError.value = "";
 
   try {
+    await fetchState();
+    startPolling();
+
     const response = await fetch(withBase(`/api/hosts/${container.host}/containers/${container.id}/scan/run?force=1`), {
       method: "POST",
     });
 
     if (!response.ok) {
       error.value = (await response.text()).trim() || t("error.unable-to-run-trivy-scan");
+      stopPolling();
       return;
     }
 
     state.value = await response.json();
   } catch (e) {
     error.value = e instanceof Error ? e.message : t("error.unable-to-run-trivy-scan");
+    stopPolling();
   } finally {
-    loading.value = false;
+    if (!state.value?.running) {
+      loading.value = false;
+      stopPolling();
+    }
   }
 }
 
-async function saveSchedule() {
-  const response = await fetch(withBase(`/api/hosts/${container.host}/containers/${container.id}/scan/schedule`), {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ enabled: scheduleEnabled.value, intervalMinutes: intervalMinutes.value }),
-  });
-  if (response.ok) {
-    state.value = await response.json();
+async function fetchStatusSummary(includeHistory: boolean) {
+  if (!enableScanStatus || !result.value) return;
+
+  statusLoading.value = true;
+  statusError.value = "";
+
+  try {
+    const response = await fetch(withBase(`/api/hosts/${container.host}/containers/${container.id}/scan/status`));
+    if (!response.ok) {
+      throw new Error((await response.text()).trim() || t("scan.unable-to-load-status"));
+    }
+    statusSummary.value = await response.json();
+  } catch (e) {
+    statusError.value = e instanceof Error ? e.message : t("scan.unable-to-load-status");
+  } finally {
+    statusLoading.value = false;
+  }
+}
+
+function extractCveKeys(issue: ScanStatusIssue): string[] {
+  const keys = new Set<string>();
+  for (const label of issue.labels ?? []) {
+    if (label.startsWith("cve:")) {
+      keys.add(label.slice(4));
+    }
+  }
+  if (issue.title) {
+    const match = issue.title.match(/CVE-\d{4}-\d+/i);
+    if (match) keys.add(match[0].toUpperCase());
+  }
+  return [...keys];
+}
+
+function statusBadgeClass(status?: string) {
+  switch ((status || "").toLowerCase()) {
+    case "open":
+    case "opened":
+    case "warning":
+      return "badge-warning";
+    case "resolved":
+    case "closed":
+      return "badge-success";
+    case "false_positive":
+      return "badge-neutral";
+    default:
+      return "badge-ghost";
   }
 }
 
@@ -242,6 +347,13 @@ onMounted(async () => {
   await fetchState();
   if (!state.value?.result) {
     await runScan();
+  } else if (state.value?.running) {
+    loading.value = true;
+    startPolling();
   }
+});
+
+onScopeDispose(() => {
+  stopPolling();
 });
 </script>

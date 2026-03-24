@@ -20,12 +20,30 @@
         class="shrink-0 select-none"
         :class="{ 'bg-secondary': route.query.logId === logEntry.id.toString() }"
       />
+      <a
+        v-if="incidentState?.status === 'matched' && incidentState.match?.url"
+        :href="incidentState.match.url"
+        target="_blank"
+        rel="noreferrer noopener"
+        class="badge badge-outline badge-sm self-start"
+        :class="incidentBadgeClass(incidentState.match?.status)"
+      >
+        {{ $t("label.incident") }} #{{ incidentState.match?.iid }}
+      </a>
+      <span
+        v-else-if="config.enableLogIncidentDebug && incidentState?.status"
+        class="badge badge-outline badge-sm self-start"
+        :class="incidentDebugBadgeClass(incidentState.status)"
+      >
+        {{ incidentDebugLabel(incidentState.status) }}
+      </span>
     </div>
     <slot />
   </div>
 </template>
 <script lang="ts" setup>
 import { LogEntry } from "@/models/LogEntry";
+import type { LogIncidentState } from "@/types/logIncidents";
 
 const { logEntry } = defineProps<{
   logEntry: LogEntry<any>;
@@ -37,6 +55,47 @@ const { hosts } = useHosts();
 
 const container = currentContainer(toRef(() => logEntry.containerID));
 const host = computed(() => hosts.value[container.value.host]);
+const resolveIncident = useLogIncident();
+const incidentState = computed(() => resolveIncident(logEntry) as LogIncidentState | undefined);
 
 const route = useRoute();
+
+function incidentBadgeClass(status?: string) {
+  switch ((status || "").toLowerCase()) {
+    case "open":
+    case "opened":
+      return "badge-warning";
+    case "resolved":
+    case "closed":
+      return "badge-success";
+    default:
+      return "badge-info";
+  }
+}
+
+function incidentDebugBadgeClass(status: LogIncidentState["status"]) {
+  switch (status) {
+    case "checking":
+      return "badge-neutral";
+    case "none":
+      return "badge-ghost";
+    case "skipped":
+      return "badge-ghost";
+    default:
+      return "badge-info";
+  }
+}
+
+function incidentDebugLabel(status: LogIncidentState["status"]) {
+  switch (status) {
+    case "checking":
+      return "incident: checking";
+    case "none":
+      return "incident: none";
+    case "skipped":
+      return "incident: skipped";
+    default:
+      return "incident: matched";
+  }
+}
 </script>

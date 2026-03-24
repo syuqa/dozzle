@@ -58,8 +58,24 @@
           <code class="bg-base-200 text-base-content rounded px-2 py-0.5 font-mono">
             {{ alert.packageTypes?.length ? alert.packageTypes.join(", ") : $t("notifications.alert.scan-all-package-types") }}
           </code>
+          <span>{{ $t("notifications.alert.scan-schedule") }}</span>
+          <span>
+            {{
+              alert.scheduleEnabled
+                ? $t("notifications.alert.scan-interval-minutes", { count: alert.intervalMinutes || 60 })
+                : $t("notifications.alert.scan-schedule-disabled")
+            }}
+          </span>
           <span>{{ $t("notifications.alert.cooldown") }}</span>
           <span>{{ $t("notifications.alert.scan-cooldown-minutes", { count: alert.cooldownMinutes || 60 }) }}</span>
+          <span>{{ $t("notifications.alert.scan-manual-trigger") }}</span>
+          <span>
+            {{
+              alert.notifyOnManual ?? true
+                ? $t("notifications.alert.scan-manual-trigger-enabled")
+                : $t("notifications.alert.scan-manual-trigger-disabled")
+            }}
+          </span>
         </template>
         <template v-else-if="alert.type === 'metric'">
           <span>{{ $t("notifications.alert.metric-filter") }}</span>
@@ -73,6 +89,16 @@
           <span>{{ $t("notifications.alert.log-filter") }}</span>
           <code class="bg-base-200 text-base-content rounded px-2 py-0.5 font-mono">{{ alert.logExpression }}</code>
         </template>
+      </div>
+
+      <div class="alert alert-error py-2 text-sm" v-if="alert.type === 'scan' && alert.lastDispatchError">
+        <div class="flex flex-col gap-1">
+          <span>{{ $t("notifications.alert.last-dispatch-error") }}</span>
+          <code class="whitespace-pre-wrap break-words">{{ alert.lastDispatchError }}</code>
+          <span v-if="alert.lastDispatchAt" class="text-xs opacity-80">
+            {{ $t("notifications.alert.last-dispatch-at", { time: formatTimeAgo(alert.lastDispatchAt) }) }}
+          </span>
+        </div>
       </div>
 
       <!-- Footer -->

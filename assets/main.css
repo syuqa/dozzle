@@ -129,6 +129,10 @@
   @apply underline-offset-4 hover:underline;
 }
 
+@utility stable-scroll {
+  scrollbar-gutter: stable;
+}
+
 @layer base {
   @media screen and (max-device-width: 480px) {
     body {

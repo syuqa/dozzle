@@ -6,7 +6,7 @@
     >
       <slot name="header"></slot>
     </header>
-    <main :data-scrolling="scrollable ? true : undefined" class="min-h-[300px] snap-y overflow-auto">
+    <main ref="scrollContainer" :data-scrolling="scrollable ? true : undefined" class="stable-scroll min-h-[300px] snap-y overflow-auto">
       <div class="invisible relative md:visible" v-show="scrollContext.paused">
         <div class="absolute top-4 right-44">
           <ScrollProgress
@@ -46,6 +46,7 @@ const { scrollable = false } = defineProps<{ scrollable?: boolean }>();
 const hasMore = ref(false);
 const scrollObserver = ref<HTMLElement>();
 const scrollableContent = ref<HTMLElement>();
+const scrollContainer = ref<HTMLElement>();
 
 const scrollContext = provideScrollContext();
 
@@ -74,7 +75,9 @@ if (!historical.value) {
 }
 
 function scrollToBottom(behavior: "auto" | "smooth" = "auto") {
-  scrollObserver.value?.scrollIntoView({ behavior });
+  const container = scrollContainer.value;
+  if (!container) return;
+  container.scrollTo({ top: container.scrollHeight, behavior });
   hasMore.value = false;
 }
 </script>

@@ -44,6 +44,9 @@ type Config struct {
 	Hostname            string
 	AppName             string
 	AppLogoURL          string
+	ScanStatusEndpoint  string
+	LogIncidentEndpoint string
+	LogIncidentDebug    bool
 	NoAnalytics         bool
 	Dev                 bool
 	Mode                string
@@ -148,6 +151,7 @@ func createRouter(h *handler) *chi.Mux {
 				r.Get("/hosts/{host}/containers/{id}/logs/stream", h.streamContainerLogs)
 				r.Get("/hosts/{host}/logs/stream", h.streamHostLogs)
 				r.Get("/hosts/{host}/containers/{id}/logs", h.fetchLogsBetweenDates)
+				r.Post("/hosts/{host}/containers/{id}/logs/match-incident", h.matchLogIncident)
 				r.Get("/hosts/{host}/logs/mergedStream/{ids}", h.streamLogsMerged)
 				r.Get("/containers/{hostIds}/download", h.downloadLogs) // formatted as host:container,host:container
 				r.Get("/labels/{labels}/logs/stream", h.streamLogsWithLabels)
@@ -163,6 +167,7 @@ func createRouter(h *handler) *chi.Mux {
 					r.Get("/hosts/{host}/containers/{id}/scan", h.getContainerScan)
 					r.Post("/hosts/{host}/containers/{id}/scan/run", h.runContainerScan)
 					r.Patch("/hosts/{host}/containers/{id}/scan/schedule", h.updateContainerScanSchedule)
+					r.Get("/hosts/{host}/containers/{id}/scan/status", h.getContainerScanStatus)
 					r.Get("/scans/summary", h.getScanSummary)
 					r.Get("/scans/alerts", h.listScanAlerts)
 					r.Post("/scans/alerts", h.createScanAlert)

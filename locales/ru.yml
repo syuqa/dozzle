@@ -53,6 +53,7 @@ label:
   host-menu: Хосты и Контейнеры
   swarm-menu: Сервисы и Стеки
   group-menu: Пользовательские Группы
+  incident: Инцидент
   no-logs: У контейнера еще нет логов
   show-all-containers: Показать все контейнеры
   collapse-all: Свернуть все
@@ -118,6 +119,15 @@ scan:
   installed: Установлено
   fixed: Исправлено
   severity: Severity
+  status: Статус задачи
+  load-status: Статус GitLab
+  unable-to-load-status: Не удалось загрузить статус задач
+  status-summary-label: "GitLab: CVE {cve}, инциденты {incidents}"
+  issue-history-title: История задачи
+  issue-history: История
+  no-history: История по задаче отсутствует.
+  no-status-issues: Для текущего контейнера задачи не найдены.
+  system: Система
   never: Никогда
 placeholder:
   search-containers: Поиск контейнеров (⌘ + k, ⌃k)
@@ -214,11 +224,19 @@ notifications:
     scan-severity: Минимальный уровень
     scan-package-types: Типы пакетов
     scan-all-package-types: все типы пакетов
+    scan-schedule: Расписание
+    scan-schedule-disabled: только вручную
+    scan-interval-minutes: каждые {count} мин
     scan-cooldown-minutes: "{count} мин"
+    scan-manual-trigger: Ручной скан
+    scan-manual-trigger-enabled: отправляет оповещения
+    scan-manual-trigger-disabled: без оповещений
     cooldown: Период ожидания
     sample-window: Окно выборки
     destination: Назначение
     dispatcher-deleted: Диспетчер удалён
+    last-dispatch-error: Последняя ошибка доставки
+    last-dispatch-at: "Попытка отправки: {time}"
     containers-count: "{count} контейнеров"
     triggered-count: "{count} сработало"
     last-triggered: "Последнее: {time}"
@@ -260,7 +278,12 @@ notifications:
     scan-severity: Минимальный уровень
     scan-package-types: Типы пакетов
     scan-package-types-placeholder: напр. os, jar, python-pkg
+    scan-schedule-enabled: Запускать сканирование по расписанию
+    scan-interval-minutes: Интервал сканирования (мин)
+    scan-interval-hint: сканирование будет запускаться каждые {count} минут для совпавших контейнеров
     scan-cooldown-hint: "{count} минут между оповещениями сканирования для контейнера"
+    scan-notify-on-manual: Отправлять оповещение при ручном скане
+    scan-notify-on-manual-hint: Если выключено, оповещения отправляются только для сканов по расписанию
   destination-form:
     create-title: Добавить Назначение
     edit-title: Редактировать Назначение

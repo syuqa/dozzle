@@ -16,6 +16,9 @@ type Args struct {
 	Hostname            string              `arg:"env:DOZZLE_HOSTNAME" help:"sets the hostname for display. This is useful with multiple Dozzle instances."`
 	AppName             string              `arg:"env:DOZZLE_APP_NAME" help:"sets a custom application name in the web interface."`
 	AppLogoURL          string              `arg:"env:DOZZLE_APP_LOGO_URL" help:"sets a custom application logo URL in the web interface."`
+	ScanStatusEndpoint  string              `arg:"env:DOZZLE_SCAN_STATUS_ENDPOINT" help:"sets an optional endpoint for fetching external scan issue status/history."`
+	LogIncidentEndpoint string              `arg:"env:DOZZLE_LOG_INCIDENT_ENDPOINT" help:"sets an optional endpoint for matching log lines to incidents."`
+	LogIncidentDebug    bool                `arg:"env:DOZZLE_LOG_INCIDENT_DEBUG" default:"false" help:"shows debug badges for log incident matching state in the UI."`
 	Level               string              `arg:"env:DOZZLE_LEVEL" default:"info" help:"set Dozzle log level. Use debug for more logging."`
 	AuthProvider        string              `arg:"--auth-provider,env:DOZZLE_AUTH_PROVIDER" default:"none" help:"sets the auth provider to use. Currently only forward-proxy is supported."`
 	AuthTTL             string              `arg:"--auth-ttl,env:DOZZLE_AUTH_TTL" default:"session" help:"sets the TTL for the auth token. Accepts duration values like 12h. Valid time units are s, m, h"`

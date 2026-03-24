@@ -23,7 +23,6 @@ watchEffect(() => {
 html.has-custom-scrollbars {
   ::-webkit-scrollbar {
     width: 8px;
-    display: content;
   }
 
   ::-webkit-scrollbar-thumb {

@@ -141,9 +141,6 @@
                     <span v-if="scanItem(container)?.lastSuccessAt">
                       <RelativeTime :date="scanLastSuccessDate(container)!" />
                     </span>
-                    <span v-else-if="scanItem(container)?.schedule?.enabled">
-                      {{ $t("label.every-minutes", { count: scanItem(container)?.schedule?.intervalMinutes }) }}
-                    </span>
                     <span v-else>{{ $t("label.scan-manual") }}</span>
                   </div>
                   <button

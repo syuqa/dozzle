@@ -10,6 +10,9 @@ export interface Config {
   hostname: string;
   appName?: string;
   appLogoUrl?: string;
+  enableScanStatus?: boolean;
+  enableLogIncidentMatch?: boolean;
+  enableLogIncidentDebug?: boolean;
   mode: "server" | "swarm" | "k8s";
   hosts: Host[];
   authProvider: "simple" | "none" | "forward-proxy";

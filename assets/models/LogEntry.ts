@@ -86,8 +86,9 @@ export class GroupedLogEntry extends LogEntry<string[]> {
     date: Date,
     public readonly level: Level,
     public readonly std: Std,
+    public readonly rawMessage: string = messages.join("\n"),
   ) {
-    super(messages as any, containerID, id, date, std, "", level);
+    super(messages as any, containerID, id, date, std, rawMessage, level);
   }
 
   public get message(): string[] {
@@ -242,13 +243,15 @@ export function asLogEntry(event: LogEvent): LogEntry<LogMessage> {
     case "complex":
       return new ComplexLogEntry(event.m as JSONObject, event.c, event.id, new Date(event.ts), event.l, std, event.rm);
     case "group":
+      const fragments = (event.m as LogFragment[]).map((f) => f.m);
       return new GroupedLogEntry(
-        (event.m as LogFragment[]).map((f) => f.m),
+        fragments,
         event.c,
         event.id,
         new Date(event.ts),
         event.l,
         std,
+        event.rm || fragments.join("\n"),
       );
     case "single":
     default:

@@ -21,6 +21,38 @@ export interface ScanVulnerability {
   primaryUrl?: string;
 }
 
+export interface ScanStatusIssue {
+  iid: number;
+  title: string;
+  url: string;
+  state: string;
+  status: string;
+  statusLabel?: string;
+  severity?: string;
+  createdAt: string;
+  updatedAt: string;
+  labels?: string[];
+  assignees?: string[];
+}
+
+export interface ScanStatusIssueGroup {
+  open?: ScanStatusIssue[];
+  resolved?: ScanStatusIssue[];
+  falsePositive?: ScanStatusIssue[];
+  total?: number;
+}
+
+export interface ScanStatusResponse {
+  container: string;
+  image: string;
+  incidents?: ScanStatusIssueGroup;
+  cve?: ScanStatusIssueGroup & {
+    summary?: ScanSummary;
+  };
+  overallStatus?: string;
+  gitlabUrl?: string;
+}
+
 export interface ScanTargetResult {
   target: string;
   type?: string;
@@ -41,6 +73,7 @@ export interface ContainerScanState {
     summary: ScanSummary;
     results: ScanTargetResult[];
   };
+  scanLog?: string[];
   lastStartedAt?: string;
   lastFinishedAt?: string;
   lastSuccessAt?: string;
