@@ -8,7 +8,6 @@ import (
 	"github.com/amir20/dozzle/internal/container"
 	"github.com/amir20/dozzle/internal/k8s"
 	"github.com/amir20/dozzle/internal/notification"
-	"github.com/amir20/dozzle/internal/notification/dispatcher"
 	container_support "github.com/amir20/dozzle/internal/support/container"
 	"github.com/amir20/dozzle/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -161,11 +160,12 @@ func (m *K8sClusterService) Subscriptions() []*notification.Subscription {
 	return []*notification.Subscription{}
 }
 
-func (m *K8sClusterService) AddDispatcher(d dispatcher.Dispatcher) int {
-	return 0
+func (m *K8sClusterService) AddDispatcher(config notification.DispatcherConfig) (int, error) {
+	return 0, fmt.Errorf("notifications not supported in k8s mode")
 }
 
-func (m *K8sClusterService) UpdateDispatcher(id int, d dispatcher.Dispatcher) {
+func (m *K8sClusterService) UpdateDispatcher(id int, config notification.DispatcherConfig) error {
+	return fmt.Errorf("notifications not supported in k8s mode")
 }
 
 func (m *K8sClusterService) RemoveDispatcher(id int) {
@@ -173,6 +173,21 @@ func (m *K8sClusterService) RemoveDispatcher(id int) {
 
 func (m *K8sClusterService) Dispatchers() []notification.DispatcherConfig {
 	return []notification.DispatcherConfig{}
+}
+
+func (m *K8sClusterService) Templates() []*notification.NotificationTemplate {
+	return []*notification.NotificationTemplate{}
+}
+
+func (m *K8sClusterService) AddTemplate(tmpl *notification.NotificationTemplate) *notification.NotificationTemplate {
+	return nil
+}
+
+func (m *K8sClusterService) UpdateTemplate(id int, tmpl *notification.NotificationTemplate) (*notification.NotificationTemplate, error) {
+	return nil, fmt.Errorf("notifications not supported in k8s mode")
+}
+
+func (m *K8sClusterService) DeleteTemplate(id int) {
 }
 
 func (m *K8sClusterService) FetchAgentNotificationStats() map[int]types.SubscriptionStats {

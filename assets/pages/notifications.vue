@@ -19,6 +19,7 @@
             :destination="dest"
             :on-updated="fetchAll"
             :existing-dispatchers="dispatchers"
+            :templates="templates"
             class="w-full md:w-72"
           />
           <!-- Add Destination Card -->
@@ -31,6 +32,22 @@
               <span class="text-base-content/60 text-sm">{{ $t("notifications.add-destination") }}</span>
             </div>
           </button>
+        </div>
+      </div>
+
+      <div class="mb-8">
+        <div class="mb-4 flex items-center justify-between">
+          <h3 class="text-base-content/60 font-semibold tracking-wide uppercase">{{ $t("notifications.templates") }}</h3>
+          <button class="btn btn-primary btn-sm" @click="openCreateTemplate">
+            <mdi:plus />
+            {{ $t("notifications.add") }}
+          </button>
+        </div>
+        <div v-if="!templates.length" class="text-base-content/60 py-4">
+          {{ $t("notifications.no-templates") }}
+        </div>
+        <div v-else class="grid gap-4 md:grid-cols-2">
+          <TemplateCard v-for="template in templates" :key="template.id" :template="template" :on-updated="fetchAll" />
         </div>
       </div>
 
@@ -62,7 +79,13 @@
           {{ $t("notifications.no-alerts") }}
         </div>
         <div v-else class="space-y-4">
-          <AlertCard v-for="alert in filteredAlerts" :key="`${alert.type ?? 'log'}:${alert.id}`" :alert="alert" :on-updated="fetchAll" />
+          <AlertCard
+            v-for="alert in filteredAlerts"
+            :key="`${alert.type ?? 'log'}:${alert.id}`"
+            :alert="alert"
+            :templates="templates"
+            :on-updated="fetchAll"
+          />
         </div>
       </div>
     </section>
@@ -70,9 +93,11 @@
 </template>
 
 <script lang="ts" setup>
-import type { NotificationRule, Dispatcher, ScanAlert, UnifiedAlert } from "@/types/notifications";
+import type { NotificationRule, Dispatcher, NotificationTemplate, ScanAlert, UnifiedAlert } from "@/types/notifications";
 import AlertForm from "@/components/Notification/AlertForm.vue";
 import DestinationForm from "@/components/Notification/DestinationForm.vue";
+import TemplateForm from "@/components/Notification/TemplateForm.vue";
+import TemplateCard from "@/components/Notification/TemplateCard.vue";
 
 const showDrawer = useDrawer();
 const router = useRouter();
@@ -81,6 +106,7 @@ const router = useRouter();
 const alerts = ref<NotificationRule[]>([]);
 const scanAlerts = ref<ScanAlert[]>([]);
 const dispatchers = ref<Dispatcher[]>([]);
+const templates = ref<NotificationTemplate[]>([]);
 
 async function fetchAlerts() {
   const res = await fetch(withBase("/api/notifications/rules"));
@@ -99,8 +125,13 @@ async function fetchScanAlerts() {
   }
 }
 
+async function fetchTemplates() {
+  const res = await fetch(withBase("/api/notifications/templates"));
+  templates.value = await res.json();
+}
+
 async function fetchAll() {
-  await Promise.all([fetchAlerts(), fetchDispatchers(), fetchScanAlerts()]);
+  await Promise.all([fetchAlerts(), fetchDispatchers(), fetchScanAlerts(), fetchTemplates()]);
 }
 
 // Handle cloudLinkSuccess hash param
@@ -117,6 +148,7 @@ onMounted(async () => {
           {
             destination,
             existingDispatchers: dispatchers.value,
+            templates: templates.value,
             showLinkSuccess: true,
           },
           "md",
@@ -131,7 +163,10 @@ onMounted(async () => {
 const filter = ref<"all" | "enabled" | "paused">("all");
 
 const unifiedAlerts = computed<UnifiedAlert[]>(() => [
-  ...alerts.value.map((alert) => ({ ...alert, type: (alert.metricExpression ? "metric" : "log") as const })),
+  ...alerts.value.map((alert) => ({
+    ...alert,
+    type: (alert.stateTriggers?.length ? "state" : alert.metricExpression ? "metric" : "log") as const,
+  })),
   ...scanAlerts.value.map((alert) => {
     const dispatcher = dispatchers.value.find((item) => item.id === alert.dispatcherId) ?? null;
     return { ...alert, dispatcher, triggeredContainers: 0, type: "scan" as const } as UnifiedAlert;
@@ -148,7 +183,7 @@ const filteredAlerts = computed(() => {
 });
 
 function openCreateAlert() {
-  showDrawer(AlertForm, { onCreated: fetchAll }, "lg");
+  showDrawer(AlertForm, { onCreated: fetchAll, templates: templates.value }, "lg");
 }
 
 function openAddDestination() {
@@ -157,9 +192,14 @@ function openAddDestination() {
     {
       onCreated: fetchAll,
       existingDispatchers: dispatchers.value,
+      templates: templates.value,
     },
     "md",
   );
+}
+
+function openCreateTemplate() {
+  showDrawer(TemplateForm, { onCreated: fetchAll }, "md");
 }
 
 </script>

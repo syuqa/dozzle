@@ -208,6 +208,7 @@ notifications:
   title: Уведомления
   description: Настройте где и когда получать оповещения
   destinations: Назначения
+  templates: Шаблоны
   add-destination: Добавить назначение
   alerts: Оповещения
   add: Добавить
@@ -216,11 +217,27 @@ notifications:
     enabled: Включены ({count})
     paused: Приостановлены ({count})
   no-alerts: Оповещения ещё не настроены. Создайте одно для начала.
+  no-templates: Шаблоны ещё не настроены. Создайте шаблон для повторного использования текста уведомлений.
   alert:
     paused: Приостановлено
     containers: Контейнеры
     log-filter: Фильтр логов
     metric-filter: Метрика
+    state-triggers: Триггеры
+    state-holdoff: Осечка состояния
+    state-holdoff-seconds: "{count} сек"
+    state-trigger-image_updated: обновление образа
+    state-trigger-stopped: остановлен
+    state-trigger-started: запущен
+    state-trigger-error: ошибка
+    state-trigger-unhealthy: healthcheck failed
+    state-trigger-restarted: перезапущен
+    state-trigger-oom_killed: OOM killed
+    shared-template: Общий шаблон
+    no-shared-template: нет
+    template-override: Переопределение шаблона
+    template-override-enabled: свой шаблон
+    template-override-disabled: шаблон назначения
     scan-severity: Минимальный уровень
     scan-package-types: Типы пакетов
     scan-all-package-types: все типы пакетов
@@ -242,13 +259,28 @@ notifications:
     last-triggered: "Последнее: {time}"
   destination:
     http-webhook: HTTP Webhook
+    telegram: Telegram
     dozzle-cloud: Dozzle Cloud
     edit: Редактировать
     delete: Удалить
+  template-form:
+    create-title: Создать Шаблон
+    edit-title: Редактировать Шаблон
+    description: Переиспользуйте один и тот же текст уведомления в назначениях и оповещениях.
+    name: Имя шаблона
+    name-placeholder: например, Security summary
+    body: Тело шаблона
+    body-placeholder: "{{ .Detail }}"
+    body-hint: Поддерживаются те же Go-переменные шаблона, что и в назначениях и оповещениях.
+    cancel: Отмена
+    create: Создать Шаблон
+    save: Сохранить Шаблон
+  template-card:
+    template-id: "Шаблон #{id}"
   alert-form:
     create-title: Создать Оповещение
     edit-title: Редактировать Оповещение
-    description: Подпишитесь на события логов, соответствующие вашим критериям
+    description: Подпишитесь на события контейнеров, соответствующие вашим критериям
     alert-name: Имя Оповещения
     alert-name-placeholder: напр., Ошибки Тестового API
     container-filter: Фильтр Контейнеров
@@ -274,6 +306,22 @@ notifications:
     alert-type: Тип оповещения
     log-alert: Оповещение журнала
     metric-alert: Оповещение метрики
+    state-alert: Оповещение контейнера
+    shared-template: Общий шаблон
+    no-shared-template: Без общего шаблона
+    template-override: Переопределение шаблона
+    template-override-placeholder: Необязательно. Переопределяет шаблон назначения только для этого оповещения.
+    template-override-hint: Оставьте пустым, чтобы использовать шаблон назначения. Это позволяет менять текст для разных триггеров без создания новых назначений.
+    state-triggers: Триггеры
+    state-holdoff-seconds: Осечка состояния (сек)
+    state-holdoff-hint: Отправлять оповещение, только если контейнер остаётся в этом состоянии указанное число секунд. 0 отправляет сразу.
+    trigger-image-updated: Образ обновлён
+    trigger-stopped: Контейнер остановлен
+    trigger-started: Контейнер запущен
+    trigger-error: Обнаружена ошибка
+    trigger-unhealthy: Health check failed
+    trigger-restarted: Контейнер перезапущен
+    trigger-oom-killed: OOM killed
     scan-alert: Оповещение сканирования
     scan-severity: Минимальный уровень
     scan-package-types: Типы пакетов
@@ -293,10 +341,21 @@ notifications:
     type: Тип
     webhook-title: HTTP Webhook
     webhook-description: Slack, Discord, пользовательская конечная точка
+    telegram-title: Telegram
+    telegram-description: Сообщение Telegram-бота в нужный чат или тред
     cloud-title: Dozzle Cloud
     cloud-description: Push-уведомления, email-оповещения и сводки на основе ИИ
     webhook-url: URL Webhook
     webhook-url-placeholder: https://hooks.foo.com/services/...
+    telegram-bot-token: Bot Token
+    telegram-chat-id: Chat ID
+    telegram-thread-id: Thread ID
+    telegram-parse-mode: Parse mode
+    telegram-no-parse-mode: Без форматирования
+    telegram-template-placeholder: "{{ .Detail }}"
+    telegram-template-hint: Текстовый Go-шаблон. Поддерживает .Container, .Detail, .Subscription и другие поля уведомления.
+    shared-template: Общий шаблон
+    no-shared-template: Без общего шаблона
     api-key: API Ключ
     payload-format: Формат Payload
     format-slack: Slack

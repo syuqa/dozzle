@@ -21,26 +21,38 @@ import (
 type Manager struct {
 	subscriptions       *xsync.Map[int, *Subscription]
 	dispatchers         *xsync.Map[int, dispatcher.Dispatcher]
+	dispatcherConfigs   *xsync.Map[int, DispatcherConfig]
+	templates           *xsync.Map[int, *NotificationTemplate]
 	subscriptionCounter atomic.Int32
 	dispatcherCounter   atomic.Int32
+	templateCounter     atomic.Int32
 	listener            *ContainerLogListener
 	statsListener       *ContainerStatsListener
+	eventListener       *ContainerEventListener
 	ctx                 context.Context
 	cancel              context.CancelFunc
 	sendSem             *semaphore.Weighted
+	containerSnapshots  *xsync.Map[string, container.Container]
+	pendingStateChecks  *xsync.Map[string, int64]
+	stateCheckCounter   atomic.Int64
 }
 
 // NewManager creates a new notification manager
-func NewManager(listener *ContainerLogListener, statsListener *ContainerStatsListener) *Manager {
+func NewManager(listener *ContainerLogListener, statsListener *ContainerStatsListener, eventListener *ContainerEventListener) *Manager {
 	ctx, cancel := context.WithCancel(context.Background())
 	m := &Manager{
-		subscriptions: xsync.NewMap[int, *Subscription](),
-		dispatchers:   xsync.NewMap[int, dispatcher.Dispatcher](),
-		listener:      listener,
-		statsListener: statsListener,
-		ctx:           ctx,
-		cancel:        cancel,
-		sendSem:       semaphore.NewWeighted(5),
+		subscriptions:      xsync.NewMap[int, *Subscription](),
+		dispatchers:        xsync.NewMap[int, dispatcher.Dispatcher](),
+		dispatcherConfigs:  xsync.NewMap[int, DispatcherConfig](),
+		templates:          xsync.NewMap[int, *NotificationTemplate](),
+		listener:           listener,
+		statsListener:      statsListener,
+		eventListener:      eventListener,
+		ctx:                ctx,
+		cancel:             cancel,
+		sendSem:            semaphore.NewWeighted(5),
+		containerSnapshots: xsync.NewMap[string, container.Container](),
+		pendingStateChecks: xsync.NewMap[string, int64](),
 	}
 
 	// Start processing log events from the listener
@@ -49,11 +61,18 @@ func NewManager(listener *ContainerLogListener, statsListener *ContainerStatsLis
 	// Start processing stat events from the stats listener
 	go m.processStatEvents()
 
+	// Start processing container lifecycle events
+	go m.processContainerEvents()
+
 	return m
 }
 
 // Start initializes the manager and starts the log listener
 func (m *Manager) Start() error {
+	for _, c := range m.listener.ListContainers() {
+		m.containerSnapshots.Store(containerStateKey(c.Host, c.ID), c)
+	}
+	m.eventListener.Start()
 	return m.listener.Start(m)
 }
 
@@ -81,8 +100,12 @@ func (m *Manager) AddSubscription(sub *Subscription) error {
 	sub.Enabled = true
 	sub.MetricCooldowns = xsync.NewMap[string, time.Time]()
 	sub.MetricSampleBuffers = xsync.NewMap[string, *utils.RingBuffer[bool]]()
+	sub.StateCooldowns = xsync.NewMap[string, time.Time]()
 
 	if err := sub.CompileExpressions(); err != nil {
+		return err
+	}
+	if err := sub.Validate(); err != nil {
 		return err
 	}
 
@@ -107,8 +130,12 @@ func (m *Manager) RemoveSubscription(id int) {
 func (m *Manager) ReplaceSubscription(sub *Subscription) error {
 	sub.MetricCooldowns = xsync.NewMap[string, time.Time]()
 	sub.MetricSampleBuffers = xsync.NewMap[string, *utils.RingBuffer[bool]]()
+	sub.StateCooldowns = xsync.NewMap[string, time.Time]()
 
 	if err := sub.CompileExpressions(); err != nil {
+		return err
+	}
+	if err := sub.Validate(); err != nil {
 		return err
 	}
 
@@ -138,20 +165,25 @@ func (m *Manager) UpdateSubscription(id int, updates map[string]any) error {
 
 		// Clone the subscription
 		updated := &Subscription{
-			ID:                  sub.ID,
-			Name:                sub.Name,
-			Enabled:             sub.Enabled,
-			DispatcherID:        sub.DispatcherID,
-			ContainerExpression: sub.ContainerExpression,
-			ContainerProgram:    sub.ContainerProgram,
-			LogExpression:       sub.LogExpression,
-			LogProgram:          sub.LogProgram,
-			MetricExpression:    sub.MetricExpression,
-			MetricProgram:       sub.MetricProgram,
-			Cooldown:            sub.Cooldown,
-			SampleWindow:        sub.SampleWindow,
-			MetricCooldowns:     sub.MetricCooldowns,
-			MetricSampleBuffers: sub.MetricSampleBuffers,
+			ID:                    sub.ID,
+			Name:                  sub.Name,
+			Enabled:               sub.Enabled,
+			DispatcherID:          sub.DispatcherID,
+			ContainerExpression:   sub.ContainerExpression,
+			ContainerProgram:      sub.ContainerProgram,
+			LogExpression:         sub.LogExpression,
+			LogProgram:            sub.LogProgram,
+			MetricExpression:      sub.MetricExpression,
+			MetricProgram:         sub.MetricProgram,
+			Cooldown:              sub.Cooldown,
+			SampleWindow:          sub.SampleWindow,
+			StateTriggers:         append([]string(nil), sub.StateTriggers...),
+			HoldoffSeconds:        sub.HoldoffSeconds,
+			Template:              sub.Template,
+			TemplateID:            sub.TemplateID,
+			MetricCooldowns:       sub.MetricCooldowns,
+			StateCooldowns:        sub.StateCooldowns,
+			MetricSampleBuffers:   sub.MetricSampleBuffers,
 			TriggeredContainerIDs: sub.TriggeredContainerIDs,
 		}
 
@@ -223,7 +255,28 @@ func (m *Manager) UpdateSubscription(id int, updates map[string]any) error {
 					updated.SampleWindow = sw
 					updated.MetricSampleBuffers = xsync.NewMap[string, *utils.RingBuffer[bool]]()
 				}
+			case "stateTriggers":
+				if triggers, ok := value.([]string); ok {
+					updated.StateTriggers = append([]string(nil), triggers...)
+				}
+			case "holdoffSeconds":
+				if holdoff, ok := value.(int); ok {
+					updated.HoldoffSeconds = holdoff
+				}
+			case "template":
+				if templateText, ok := value.(string); ok {
+					updated.Template = templateText
+				}
+			case "templateId":
+				if templateID, ok := value.(int); ok {
+					updated.TemplateID = templateID
+				}
 			}
+		}
+
+		if err := updated.Validate(); err != nil {
+			updateErr = err
+			return nil, xsync.CancelOp
 		}
 
 		return updated, xsync.UpdateOp
@@ -264,23 +317,37 @@ func (m *Manager) updateListeners() {
 	}
 }
 
-// AddDispatcher adds a dispatcher and returns its auto-generated ID
-func (m *Manager) AddDispatcher(d dispatcher.Dispatcher) int {
+// AddDispatcher adds a dispatcher config and returns its auto-generated ID
+func (m *Manager) AddDispatcher(config DispatcherConfig) (int, error) {
 	id := int(m.dispatcherCounter.Add(1))
+	config.ID = id
+	d, err := m.createDispatcher(config)
+	if err != nil {
+		return 0, err
+	}
+	m.dispatcherConfigs.Store(id, config)
 	m.dispatchers.Store(id, d)
 	log.Debug().Int("id", id).Msg("Added dispatcher")
-	return id
+	return id, nil
 }
 
 // UpdateDispatcher updates a dispatcher by ID
-func (m *Manager) UpdateDispatcher(id int, d dispatcher.Dispatcher) {
+func (m *Manager) UpdateDispatcher(id int, config DispatcherConfig) error {
+	config.ID = id
+	d, err := m.createDispatcher(config)
+	if err != nil {
+		return err
+	}
+	m.dispatcherConfigs.Store(id, config)
 	m.dispatchers.Store(id, d)
 	log.Debug().Int("id", id).Msg("Updated dispatcher")
+	return nil
 }
 
 // RemoveDispatcher removes a dispatcher by ID
 func (m *Manager) RemoveDispatcher(id int) {
 	if _, ok := m.dispatchers.LoadAndDelete(id); ok {
+		m.dispatcherConfigs.Delete(id)
 		log.Debug().Int("id", id).Msg("Removed dispatcher")
 	}
 }
@@ -329,31 +396,77 @@ func (m *Manager) GetNotificationStats() []types.SubscriptionStats {
 // Dispatchers returns all dispatchers as DispatcherConfig sorted by ID
 func (m *Manager) Dispatchers() []DispatcherConfig {
 	result := make([]DispatcherConfig, 0)
-	m.dispatchers.Range(func(id int, d dispatcher.Dispatcher) bool {
-		switch v := d.(type) {
-		case *dispatcher.WebhookDispatcher:
-			result = append(result, DispatcherConfig{
-				ID:       id,
-				Name:     v.Name,
-				Type:     "webhook",
-				URL:      v.URL,
-				Template: v.TemplateText,
-				Headers:  v.Headers,
-			})
-		case *dispatcher.CloudDispatcher:
-			result = append(result, DispatcherConfig{
-				ID:        id,
-				Name:      v.Name,
-				Type:      "cloud",
-				APIKey:    v.APIKey,
-				Prefix:    v.Prefix,
-				ExpiresAt: v.ExpiresAt,
-			})
-		}
+	m.dispatcherConfigs.Range(func(_ int, cfg DispatcherConfig) bool {
+		result = append(result, cfg)
 		return true
 	})
 	slices.SortFunc(result, func(a, b DispatcherConfig) int {
 		return a.ID - b.ID
 	})
 	return result
+}
+
+func (m *Manager) Templates() []*NotificationTemplate {
+	result := make([]*NotificationTemplate, 0)
+	m.templates.Range(func(_ int, tmpl *NotificationTemplate) bool {
+		copyTemplate := *tmpl
+		result = append(result, &copyTemplate)
+		return true
+	})
+	slices.SortFunc(result, func(a, b *NotificationTemplate) int { return a.ID - b.ID })
+	return result
+}
+
+func (m *Manager) AddTemplate(tmpl *NotificationTemplate) *NotificationTemplate {
+	tmpl.ID = int(m.templateCounter.Add(1))
+	copyTemplate := *tmpl
+	m.templates.Store(tmpl.ID, &copyTemplate)
+	return &copyTemplate
+}
+
+func (m *Manager) UpdateTemplate(id int, tmpl *NotificationTemplate) (*NotificationTemplate, error) {
+	tmpl.ID = id
+	copyTemplate := *tmpl
+	m.templates.Store(id, &copyTemplate)
+	m.rebuildDispatchersForTemplate(id)
+	return &copyTemplate, nil
+}
+
+func (m *Manager) DeleteTemplate(id int) {
+	m.templates.Delete(id)
+	m.rebuildDispatchersForTemplate(id)
+}
+
+func (m *Manager) ResolveTemplate(templateID int, inline string) string {
+	return m.resolveTemplate(templateID, inline)
+}
+
+func (m *Manager) resolveTemplate(templateID int, inline string) string {
+	if templateID > 0 {
+		if tmpl, ok := m.templates.Load(templateID); ok {
+			return tmpl.Body
+		}
+	}
+	return inline
+}
+
+func (m *Manager) rebuildDispatchersForTemplate(templateID int) {
+	m.dispatcherConfigs.Range(func(id int, cfg DispatcherConfig) bool {
+		if cfg.TemplateID != templateID {
+			return true
+		}
+		d, err := m.createDispatcher(cfg)
+		if err != nil {
+			log.Warn().Err(err).Int("dispatcher", id).Msg("Failed to rebuild dispatcher after template change")
+			return true
+		}
+		m.dispatchers.Store(id, d)
+		return true
+	})
+}
+
+func (m *Manager) createDispatcher(config DispatcherConfig) (dispatcher.Dispatcher, error) {
+	resolved := config
+	resolved.Template = m.resolveTemplate(config.TemplateID, config.Template)
+	return createDispatcher(resolved)
 }

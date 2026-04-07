@@ -34,6 +34,10 @@ func (s *stubHostService) Dispatchers() []notification.DispatcherConfig {
 	return nil
 }
 
+func (s *stubHostService) Templates() []*notification.NotificationTemplate {
+	return nil
+}
+
 func (s *stubHostService) Hosts() []container.Host {
 	return s.hosts
 }

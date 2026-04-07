@@ -9,7 +9,6 @@ import (
 
 	"github.com/amir20/dozzle/internal/container"
 	"github.com/amir20/dozzle/internal/notification"
-	"github.com/amir20/dozzle/internal/notification/dispatcher"
 	container_support "github.com/amir20/dozzle/internal/support/container"
 	"github.com/amir20/dozzle/types"
 	"github.com/rs/zerolog/log"
@@ -190,7 +189,8 @@ func (m *MultiHostService) StartNotificationManager(ctx context.Context) error {
 	clients := m.manager.LocalClientServices()
 	listener := notification.NewContainerLogListener(ctx, clients)
 	statsListener := notification.NewContainerStatsListener(ctx, clients)
-	m.notificationManager = notification.NewManager(listener, statsListener)
+	eventListener := notification.NewContainerEventListener(ctx, clients)
+	m.notificationManager = notification.NewManager(listener, statsListener, eventListener)
 
 	// Start first so matcher is available for LoadConfig
 	if err := m.notificationManager.Start(); err != nil {
@@ -254,6 +254,9 @@ func (m *MultiHostService) broadcastNotificationConfig() {
 			MetricExpression:    sub.MetricExpression,
 			Cooldown:            sub.Cooldown,
 			SampleWindow:        sub.SampleWindow,
+			StateTriggers:       append([]string(nil), sub.StateTriggers...),
+			HoldoffSeconds:      sub.HoldoffSeconds,
+			Template:            m.notificationManager.ResolveTemplate(sub.TemplateID, sub.Template),
 		}
 	}
 
@@ -261,14 +264,19 @@ func (m *MultiHostService) broadcastNotificationConfig() {
 	dispatchers := make([]types.DispatcherConfig, len(notifDispatchers))
 	for i, d := range notifDispatchers {
 		dispatchers[i] = types.DispatcherConfig{
-			ID:        d.ID,
-			Name:      d.Name,
-			Type:      d.Type,
-			URL:       d.URL,
-			Template:  d.Template,
-			APIKey:    d.APIKey,
-			Prefix:    d.Prefix,
-			ExpiresAt: d.ExpiresAt,
+			ID:              d.ID,
+			Name:            d.Name,
+			Type:            d.Type,
+			URL:             d.URL,
+			Template:        m.notificationManager.ResolveTemplate(d.TemplateID, d.Template),
+			Headers:         d.Headers,
+			APIKey:          d.APIKey,
+			Prefix:          d.Prefix,
+			ExpiresAt:       d.ExpiresAt,
+			BotToken:        d.BotToken,
+			ChatID:          d.ChatID,
+			MessageThreadID: d.MessageThreadID,
+			ParseMode:       d.ParseMode,
 		}
 	}
 
@@ -306,16 +314,22 @@ func (m *MultiHostService) RemoveSubscription(id int) {
 }
 
 // AddDispatcher adds a dispatcher and returns its auto-generated ID
-func (m *MultiHostService) AddDispatcher(d dispatcher.Dispatcher) int {
-	id := m.notificationManager.AddDispatcher(d)
+func (m *MultiHostService) AddDispatcher(config notification.DispatcherConfig) (int, error) {
+	id, err := m.notificationManager.AddDispatcher(config)
+	if err != nil {
+		return 0, err
+	}
 	m.saveNotificationConfig()
-	return id
+	return id, nil
 }
 
 // UpdateDispatcher updates a dispatcher by ID
-func (m *MultiHostService) UpdateDispatcher(id int, d dispatcher.Dispatcher) {
-	m.notificationManager.UpdateDispatcher(id, d)
+func (m *MultiHostService) UpdateDispatcher(id int, config notification.DispatcherConfig) error {
+	if err := m.notificationManager.UpdateDispatcher(id, config); err != nil {
+		return err
+	}
 	m.saveNotificationConfig()
+	return nil
 }
 
 // RemoveDispatcher removes a dispatcher by ID
@@ -350,6 +364,30 @@ func (m *MultiHostService) Subscriptions() []*notification.Subscription {
 // Dispatchers returns all dispatchers
 func (m *MultiHostService) Dispatchers() []notification.DispatcherConfig {
 	return m.notificationManager.Dispatchers()
+}
+
+func (m *MultiHostService) Templates() []*notification.NotificationTemplate {
+	return m.notificationManager.Templates()
+}
+
+func (m *MultiHostService) AddTemplate(tmpl *notification.NotificationTemplate) *notification.NotificationTemplate {
+	created := m.notificationManager.AddTemplate(tmpl)
+	m.saveNotificationConfig()
+	return created
+}
+
+func (m *MultiHostService) UpdateTemplate(id int, tmpl *notification.NotificationTemplate) (*notification.NotificationTemplate, error) {
+	updated, err := m.notificationManager.UpdateTemplate(id, tmpl)
+	if err != nil {
+		return nil, err
+	}
+	m.saveNotificationConfig()
+	return updated, nil
+}
+
+func (m *MultiHostService) DeleteTemplate(id int) {
+	m.notificationManager.DeleteTemplate(id)
+	m.saveNotificationConfig()
 }
 
 // NotificationStatsProvider is an interface for clients that can report notification stats

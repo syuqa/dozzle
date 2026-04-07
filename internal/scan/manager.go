@@ -28,6 +28,7 @@ type HostService interface {
 	FindContainer(host string, id string, labels container.ContainerLabels) (*container_support.ContainerService, error)
 	ListAllContainers(labels container.ContainerLabels) ([]container.Container, []error)
 	Dispatchers() []notification.DispatcherConfig
+	Templates() []*notification.NotificationTemplate
 	Hosts() []container.Host
 }
 
@@ -107,6 +108,8 @@ type ScanAlert struct {
 	IntervalMinutes     int        `json:"intervalMinutes,omitempty"`
 	CooldownMinutes     int        `json:"cooldownMinutes,omitempty"`
 	NotifyOnManual      *bool      `json:"notifyOnManual,omitempty"`
+	Template            string     `json:"template,omitempty"`
+	TemplateID          int        `json:"templateId,omitempty"`
 	TriggerCount        int64      `json:"triggerCount"`
 	LastTriggeredAt     *time.Time `json:"lastTriggeredAt,omitempty"`
 	LastDispatchAt      *time.Time `json:"lastDispatchAt,omitempty"`
@@ -862,6 +865,7 @@ func (m *Manager) dispatchAlerts(ctx context.Context, state *ContainerScanState,
 	dispatcherConfigs := m.hostService.Dispatchers()
 	dispatcherByID := make(map[int]notification.DispatcherConfig, len(dispatcherConfigs))
 	for _, cfg := range dispatcherConfigs {
+		cfg.Template = m.resolveTemplate(cfg.TemplateID, cfg.Template)
 		dispatcherByID[cfg.ID] = cfg
 	}
 
@@ -875,6 +879,17 @@ func (m *Manager) dispatchAlerts(ctx context.Context, state *ContainerScanState,
 		if err != nil {
 			log.Warn().Err(err).Int("dispatcher", alert.DispatcherID).Msg("scan alert dispatcher init failed")
 			continue
+		}
+		templateText := m.resolveTemplate(alert.TemplateID, alert.Template)
+		if strings.TrimSpace(templateText) != "" {
+			if overrideCapable, ok := d.(dispatcher.TemplateOverrideCapable); ok {
+				override, err := overrideCapable.WithTemplate(templateText)
+				if err != nil {
+					log.Warn().Err(err).Str("alert", alert.Name).Msg("scan alert template override init failed")
+					continue
+				}
+				d = override
+			}
 		}
 		notificationPayload := types.Notification{
 			ID:        fmt.Sprintf("scan-%s-%d", state.Container.ID, time.Now().Unix()),
@@ -910,6 +925,18 @@ func (m *Manager) dispatchAlerts(ctx context.Context, state *ContainerScanState,
 		alert.LastDispatchError = ""
 		m.persistDispatchMeta(alert)
 	}
+}
+
+func (m *Manager) resolveTemplate(templateID int, inline string) string {
+	if templateID <= 0 {
+		return inline
+	}
+	for _, tmpl := range m.hostService.Templates() {
+		if tmpl.ID == templateID {
+			return tmpl.Body
+		}
+	}
+	return inline
 }
 
 func (m *Manager) persistDispatchMeta(alert *ScanAlert) {
@@ -1049,6 +1076,15 @@ func createDispatcher(config notification.DispatcherConfig) (dispatcher.Dispatch
 		return dispatcher.NewWebhookDispatcher(config.Name, config.URL, config.Template, config.Headers)
 	case "cloud":
 		return dispatcher.NewCloudDispatcher(config.Name, config.APIKey, config.Prefix, config.ExpiresAt)
+	case "telegram":
+		return dispatcher.NewTelegramDispatcher(
+			config.Name,
+			config.BotToken,
+			config.ChatID,
+			config.MessageThreadID,
+			config.ParseMode,
+			config.Template,
+		)
 	default:
 		return nil, fmt.Errorf("unknown dispatcher type: %s", config.Type)
 	}

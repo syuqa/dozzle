@@ -6,6 +6,7 @@
         <div class="flex items-center gap-2">
           <h4 class="flex items-center gap-2 text-lg font-semibold">
             <mdi:shield-search v-if="alert.type === 'scan'" class="text-info" />
+            <mdi:cube-outline v-else-if="alert.type === 'state'" class="text-info" />
             <mdi:chart-line v-else-if="alert.type === 'metric'" class="text-info" />
             <mdi:text-box-outline v-else class="text-info" />
             <span>{{ alert.name }}</span> <span class="text-sm font-light">→</span>
@@ -18,6 +19,7 @@
               >
                 <template v-if="alert.dispatcher">
                   <mdi:webhook v-if="alert.dispatcher.type === 'webhook'" />
+                  <mdi:telegram v-else-if="alert.dispatcher.type === 'telegram'" />
                   <mdi:cloud v-else />
                   {{ alert.dispatcher.name }}
                 </template>
@@ -35,6 +37,7 @@
                     @click="changeDispatcher(dest.id)"
                   >
                     <mdi:webhook v-if="dest.type === 'webhook'" />
+                    <mdi:telegram v-else-if="dest.type === 'telegram'" />
                     <mdi:cloud v-else />
                     {{ dest.name }}
                   </a>
@@ -76,6 +79,26 @@
                 : $t("notifications.alert.scan-manual-trigger-disabled")
             }}
           </span>
+          <span>{{ $t("notifications.alert.shared-template") }}</span>
+          <span>{{ selectedTemplateName || $t("notifications.alert.no-shared-template") }}</span>
+          <span>{{ $t("notifications.alert.template-override") }}</span>
+          <span>{{ alert.template ? $t("notifications.alert.template-override-enabled") : $t("notifications.alert.template-override-disabled") }}</span>
+        </template>
+        <template v-else-if="alert.type === 'state'">
+          <span>{{ $t("notifications.alert.state-triggers") }}</span>
+          <code class="bg-base-200 text-base-content rounded px-2 py-0.5 font-mono">
+            {{
+              alert.stateTriggers?.length
+                ? alert.stateTriggers.map((trigger) => $t(`notifications.alert.state-trigger-${trigger}`)).join(", ")
+                : "-"
+            }}
+          </code>
+          <span>{{ $t("notifications.alert.state-holdoff") }}</span>
+          <span>{{ $t("notifications.alert.state-holdoff-seconds", { count: alert.holdoffSeconds || 0 }) }}</span>
+          <span>{{ $t("notifications.alert.shared-template") }}</span>
+          <span>{{ selectedTemplateName || $t("notifications.alert.no-shared-template") }}</span>
+          <span>{{ $t("notifications.alert.template-override") }}</span>
+          <span>{{ alert.template ? $t("notifications.alert.template-override-enabled") : $t("notifications.alert.template-override-disabled") }}</span>
         </template>
         <template v-else-if="alert.type === 'metric'">
           <span>{{ $t("notifications.alert.metric-filter") }}</span>
@@ -84,10 +107,18 @@
           <span>{{ formatDuration(alert.sampleWindow || 15, locale || undefined) }}</span>
           <span>{{ $t("notifications.alert.cooldown") }}</span>
           <span>{{ formatDuration(alert.cooldown || 300, locale || undefined) }}</span>
+          <span>{{ $t("notifications.alert.shared-template") }}</span>
+          <span>{{ selectedTemplateName || $t("notifications.alert.no-shared-template") }}</span>
+          <span>{{ $t("notifications.alert.template-override") }}</span>
+          <span>{{ alert.template ? $t("notifications.alert.template-override-enabled") : $t("notifications.alert.template-override-disabled") }}</span>
         </template>
         <template v-else>
           <span>{{ $t("notifications.alert.log-filter") }}</span>
           <code class="bg-base-200 text-base-content rounded px-2 py-0.5 font-mono">{{ alert.logExpression }}</code>
+          <span>{{ $t("notifications.alert.shared-template") }}</span>
+          <span>{{ selectedTemplateName || $t("notifications.alert.no-shared-template") }}</span>
+          <span>{{ $t("notifications.alert.template-override") }}</span>
+          <span>{{ alert.template ? $t("notifications.alert.template-override-enabled") : $t("notifications.alert.template-override-disabled") }}</span>
         </template>
       </div>
 
@@ -129,17 +160,19 @@
 </template>
 
 <script lang="ts" setup>
-import type { Dispatcher, UnifiedAlert } from "@/types/notifications";
+import type { Dispatcher, NotificationTemplate, UnifiedAlert } from "@/types/notifications";
 import AlertForm from "./AlertForm.vue";
 
-const { alert, onUpdated } = defineProps<{
+const { alert, templates = [], onUpdated } = defineProps<{
   alert: UnifiedAlert;
+  templates?: NotificationTemplate[];
   onUpdated?: () => void;
 }>();
 
 const showDrawer = useDrawer();
 const isDeleting = ref(false);
 const dispatchers = ref<Dispatcher[]>([]);
+const selectedTemplateName = computed(() => templates.find((item) => item.id === alert.templateId)?.name ?? "");
 
 onMounted(async () => {
   const res = await fetch(withBase("/api/notifications/dispatchers"));
@@ -177,7 +210,7 @@ async function toggleEnabled() {
 }
 
 function editAlert() {
-  showDrawer(AlertForm, { alert, onCreated: onUpdated }, "lg");
+  showDrawer(AlertForm, { alert, templates, onCreated: onUpdated }, "lg");
 }
 
 async function deleteAlert() {

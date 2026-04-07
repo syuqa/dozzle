@@ -45,6 +45,14 @@
 
     <!-- Template -->
     <fieldset class="fieldset">
+      <legend class="fieldset-legend text-lg">{{ $t("notifications.destination-form.shared-template") }}</legend>
+      <select v-model.number="templateId" class="select select-bordered w-full">
+        <option :value="0">{{ $t("notifications.destination-form.no-shared-template") }}</option>
+        <option v-for="item in templates" :key="item.id" :value="item.id">{{ item.name }}</option>
+      </select>
+    </fieldset>
+
+    <fieldset class="fieldset">
       <legend class="fieldset-legend text-lg">
         {{ $t("notifications.destination-form.template") }}
         <span class="text-base-content/60 ml-2 text-sm font-normal">{{
@@ -129,15 +137,16 @@
 </template>
 
 <script lang="ts" setup>
-import type { Dispatcher, TestWebhookResult } from "@/types/notifications";
+import type { Dispatcher, NotificationTemplate, TestWebhookResult } from "@/types/notifications";
 import { createTemplateEditor } from "@/composable/templateEditor";
 import { PAYLOAD_TEMPLATES, type PayloadFormat } from "./payloadTemplates";
 
-const { close, onCreated, destination, isEditing } = defineProps<{
+const { close, onCreated, destination, isEditing, templates = [] } = defineProps<{
   close?: () => void;
   onCreated?: () => void;
   destination?: Dispatcher;
   isEditing: boolean;
+  templates?: NotificationTemplate[];
 }>();
 
 const nameInput = ref<HTMLInputElement>();
@@ -145,6 +154,7 @@ const templateEditorRef = ref<HTMLElement>();
 const name = ref(destination?.name ?? "");
 useFocus(nameInput, { initialValue: true });
 const webhookUrl = ref(destination?.url ?? "");
+const templateId = ref(destination?.templateId ?? 0);
 const payloadFormat = ref<PayloadFormat>(isEditing ? "custom" : "slack");
 const template = ref(isEditing ? (destination?.template ?? "") : PAYLOAD_TEMPLATES[payloadFormat.value]);
 let headerKeyCounter = 0;
@@ -221,7 +231,9 @@ async function testDestination() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        type: "webhook",
         url: webhookUrl.value.trim(),
+        templateId: templateId.value || undefined,
         template: template.value.trim() || undefined,
         headers: headersToRecord(),
       }),
@@ -247,6 +259,7 @@ async function saveDestination() {
       name: name.value.trim(),
       type: "webhook",
       url: webhookUrl.value.trim(),
+      templateId: templateId.value || undefined,
       template: template.value.trim() || undefined,
       headers: headersToRecord(),
     };

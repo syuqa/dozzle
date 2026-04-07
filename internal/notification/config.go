@@ -15,9 +15,14 @@ import (
 
 // WriteConfig writes the current configuration to a writer in YAML format
 func (m *Manager) WriteConfig(w io.Writer) error {
+	templates := make([]NotificationTemplate, 0)
+	for _, tmpl := range m.Templates() {
+		templates = append(templates, *tmpl)
+	}
 	config := Config{
 		Subscriptions: m.Subscriptions(),
 		Dispatchers:   m.Dispatchers(),
+		Templates:     templates,
 	}
 
 	encoder := yaml.NewEncoder(w)
@@ -48,23 +53,43 @@ func (m *Manager) LoadConfig(r io.Reader) error {
 			MetricExpression:    sub.MetricExpression,
 			Cooldown:            sub.Cooldown,
 			SampleWindow:        sub.SampleWindow,
+			StateTriggers:       append([]string(nil), sub.StateTriggers...),
+			HoldoffSeconds:      sub.HoldoffSeconds,
+			Template:            sub.Template,
+			TemplateID:          sub.TemplateID,
 		}
 	}
 
 	dispatchers := make([]types.DispatcherConfig, len(config.Dispatchers))
 	for i, d := range config.Dispatchers {
 		dispatchers[i] = types.DispatcherConfig{
-			ID:        d.ID,
-			Name:      d.Name,
-			Type:      d.Type,
-			URL:       d.URL,
-			Template:  d.Template,
-			Headers:   d.Headers,
-			APIKey:    d.APIKey,
-			Prefix:    d.Prefix,
-			ExpiresAt: d.ExpiresAt,
+			ID:              d.ID,
+			Name:            d.Name,
+			Type:            d.Type,
+			URL:             d.URL,
+			Template:        d.Template,
+			TemplateID:      d.TemplateID,
+			Headers:         d.Headers,
+			APIKey:          d.APIKey,
+			Prefix:          d.Prefix,
+			ExpiresAt:       d.ExpiresAt,
+			BotToken:        d.BotToken,
+			ChatID:          d.ChatID,
+			MessageThreadID: d.MessageThreadID,
+			ParseMode:       d.ParseMode,
 		}
 	}
+
+	m.templates.Clear()
+	maxTemplateID := 0
+	for _, tmpl := range config.Templates {
+		copyTemplate := tmpl
+		m.templates.Store(tmpl.ID, &copyTemplate)
+		if tmpl.ID > maxTemplateID {
+			maxTemplateID = tmpl.ID
+		}
+	}
+	m.templateCounter.Store(int32(maxTemplateID))
 
 	return m.HandleNotificationConfig(subscriptions, dispatchers)
 }
@@ -92,6 +117,7 @@ func (m *Manager) HandleNotificationConfig(subscriptions []types.SubscriptionCon
 
 	// Clear dispatchers (no stats to preserve)
 	m.dispatchers.Clear()
+	m.dispatcherConfigs.Clear()
 
 	// Find max IDs to initialize counters
 	var maxSubID, maxDispatcherID int
@@ -120,6 +146,10 @@ func (m *Manager) HandleNotificationConfig(subscriptions []types.SubscriptionCon
 			MetricExpression:    sub.MetricExpression,
 			Cooldown:            sub.Cooldown,
 			SampleWindow:        sub.SampleWindow,
+			StateTriggers:       append([]string(nil), sub.StateTriggers...),
+			HoldoffSeconds:      sub.HoldoffSeconds,
+			Template:            sub.Template,
+			TemplateID:          sub.TemplateID,
 		}
 
 		if old, ok := existing[sub.ID]; ok {
@@ -144,6 +174,14 @@ func (m *Manager) HandleNotificationConfig(subscriptions []types.SubscriptionCon
 				})
 			}
 
+			s.StateCooldowns = xsync.NewMap[string, time.Time]()
+			if old.StateCooldowns != nil {
+				old.StateCooldowns.Range(func(id string, t time.Time) bool {
+					s.StateCooldowns.Store(id, t)
+					return true
+				})
+			}
+
 			// MetricSampleBuffers: start fresh since ring buffers can't be safely cloned
 		}
 
@@ -154,20 +192,27 @@ func (m *Manager) HandleNotificationConfig(subscriptions []types.SubscriptionCon
 
 	// Load dispatchers
 	for _, dc := range dispatchers {
-		d, err := createDispatcher(DispatcherConfig{
-			ID:        dc.ID,
-			Name:      dc.Name,
-			Type:      dc.Type,
-			URL:       dc.URL,
-			Template:  dc.Template,
-			Headers:   dc.Headers,
-			APIKey:    dc.APIKey,
-			Prefix:    dc.Prefix,
-			ExpiresAt: dc.ExpiresAt,
-		})
+		cfg := DispatcherConfig{
+			ID:              dc.ID,
+			Name:            dc.Name,
+			Type:            dc.Type,
+			URL:             dc.URL,
+			Template:        dc.Template,
+			TemplateID:      dc.TemplateID,
+			Headers:         dc.Headers,
+			APIKey:          dc.APIKey,
+			Prefix:          dc.Prefix,
+			ExpiresAt:       dc.ExpiresAt,
+			BotToken:        dc.BotToken,
+			ChatID:          dc.ChatID,
+			MessageThreadID: dc.MessageThreadID,
+			ParseMode:       dc.ParseMode,
+		}
+		d, err := m.createDispatcher(cfg)
 		if err != nil {
 			return fmt.Errorf("failed to create dispatcher %s: %w", dc.Name, err)
 		}
+		m.dispatcherConfigs.Store(dc.ID, cfg)
 		m.dispatchers.Store(dc.ID, d)
 		log.Debug().Int("id", dc.ID).Msg("Loaded dispatcher from state sync")
 	}
@@ -185,6 +230,15 @@ func createDispatcher(config DispatcherConfig) (dispatcher.Dispatcher, error) {
 		return dispatcher.NewWebhookDispatcher(config.Name, config.URL, config.Template, config.Headers)
 	case "cloud":
 		return dispatcher.NewCloudDispatcher(config.Name, config.APIKey, config.Prefix, config.ExpiresAt)
+	case "telegram":
+		return dispatcher.NewTelegramDispatcher(
+			config.Name,
+			config.BotToken,
+			config.ChatID,
+			config.MessageThreadID,
+			config.ParseMode,
+			config.Template,
+		)
 	default:
 		return nil, fmt.Errorf("unknown dispatcher type: %s", config.Type)
 	}
@@ -201,6 +255,12 @@ func (m *Manager) loadSubscription(sub *Subscription) error {
 	}
 	if sub.MetricSampleBuffers == nil {
 		sub.MetricSampleBuffers = xsync.NewMap[string, *utils.RingBuffer[bool]]()
+	}
+	if sub.StateCooldowns == nil {
+		sub.StateCooldowns = xsync.NewMap[string, time.Time]()
+	}
+	if err := sub.Validate(); err != nil {
+		return err
 	}
 
 	m.subscriptions.Store(sub.ID, sub)

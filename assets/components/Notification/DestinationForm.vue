@@ -38,6 +38,17 @@
             </div>
           </div>
         </label>
+        <label class="card card-border 20 cursor-pointer transition-colors" :class="type === 'telegram' ? 'border-primary bg-primary/10' : ''">
+          <div class="card-body flex-row items-center gap-3 p-4">
+            <input type="radio" v-model="type" value="telegram" class="radio radio-primary" />
+            <div>
+              <div class="font-semibold">{{ $t("notifications.destination-form.telegram-title") }}</div>
+              <div class="text-base-content/60 text-sm">
+                {{ $t("notifications.destination-form.telegram-description") }}
+              </div>
+            </div>
+          </div>
+        </label>
         <label
           class="card card-border border-base-content/20 transition-colors"
           :class="[
@@ -74,32 +85,44 @@
       :close="close"
       :on-created="onCreated"
       :is-editing="isEditing"
+      :templates="templates"
+    />
+    <TelegramDestinationForm
+      v-else-if="type === 'telegram'"
+      :destination="destination"
+      :close="close"
+      :on-created="onCreated"
+      :is-editing="isEditing"
+      :templates="templates"
     />
     <CloudDestinationForm v-else :destination="destination" :close="close" />
   </div>
 </template>
 
 <script lang="ts" setup>
-import type { Dispatcher } from "@/types/notifications";
+import type { Dispatcher, NotificationTemplate } from "@/types/notifications";
 import WebhookDestinationForm from "./WebhookDestinationForm.vue";
 import CloudDestinationForm from "./CloudDestinationForm.vue";
+import TelegramDestinationForm from "./TelegramDestinationForm.vue";
 
 const {
   close,
   onCreated,
   destination,
   existingDispatchers = [],
+  templates = [],
   showLinkSuccess = false,
 } = defineProps<{
   close?: () => void;
   onCreated?: () => void;
   destination?: Dispatcher;
   existingDispatchers?: Dispatcher[];
+  templates?: NotificationTemplate[];
   showLinkSuccess?: boolean;
 }>();
 
 const isEditing = !!destination;
-const type = ref<"webhook" | "cloud">((destination?.type as "webhook" | "cloud") ?? "webhook");
+const type = ref<"webhook" | "telegram" | "cloud">((destination?.type as "webhook" | "telegram" | "cloud") ?? "webhook");
 
 const hasExistingCloudDestination = computed(() => {
   const others = isEditing ? existingDispatchers.filter((d) => d.id !== destination!.id) : existingDispatchers;

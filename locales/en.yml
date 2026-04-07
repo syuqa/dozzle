@@ -217,6 +217,7 @@ notifications:
   title: Notifications
   description: Configure where and when to receive alerts
   destinations: Destinations
+  templates: Templates
   add-destination: Add destination
   alerts: Alerts
   add: Add
@@ -225,11 +226,27 @@ notifications:
     enabled: Enabled ({count})
     paused: Paused ({count})
   no-alerts: No alerts configured yet. Create one to get started.
+  no-templates: No templates configured yet. Create one to reuse notification bodies.
   alert:
     paused: Paused
     containers: Containers
     log-filter: Log filter
     metric-filter: Metric
+    state-triggers: Triggers
+    state-holdoff: State holdoff
+    state-holdoff-seconds: "{count} sec"
+    state-trigger-image_updated: image updated
+    state-trigger-stopped: stopped
+    state-trigger-started: started
+    state-trigger-error: error
+    state-trigger-unhealthy: unhealthy
+    state-trigger-restarted: restarted
+    state-trigger-oom_killed: OOM killed
+    shared-template: Shared template
+    no-shared-template: none
+    template-override: Template override
+    template-override-enabled: custom template
+    template-override-disabled: destination default
     scan-severity: Minimum severity
     scan-package-types: Package types
     scan-all-package-types: all package types
@@ -251,13 +268,27 @@ notifications:
     last-triggered: "Last: {time}"
   destination:
     http-webhook: HTTP Webhook
+    telegram: Telegram
     dozzle-cloud: Dozzle Cloud
     edit: Edit
-    delete: Delete
+  template-form:
+    create-title: Create Template
+    edit-title: Edit Template
+    description: Reuse the same message body across destinations and alerts.
+    name: Template name
+    name-placeholder: e.g. Security summary
+    body: Template body
+    body-placeholder: "{{ .Detail }}"
+    body-hint: Supports the same Go template variables as destinations and alerts.
+    cancel: Cancel
+    create: Create Template
+    save: Save Template
+  template-card:
+    template-id: "Template #{id}"
   alert-form:
     create-title: Create Alert
     edit-title: Edit Alert
-    description: Subscribe to log events matching your criteria
+    description: Subscribe to container events matching your criteria
     alert-name: Alert Name
     alert-name-placeholder: e.g., Test API Errors
     container-filter: Container Filter
@@ -283,6 +314,22 @@ notifications:
     alert-type: Alert Type
     log-alert: Log Alert
     metric-alert: Metric Alert
+    state-alert: Container Alert
+    shared-template: Shared template
+    no-shared-template: No shared template
+    template-override: Template override
+    template-override-placeholder: Optional. Overrides the destination template only for this alert.
+    template-override-hint: Leave empty to use the destination default template. Works well for different triggers that share the same destination.
+    state-triggers: Triggers
+    state-holdoff-seconds: Holdoff (sec)
+    state-holdoff-hint: Send only if the container remains in the triggered state for this many seconds. 0 sends immediately.
+    trigger-image-updated: Image updated
+    trigger-stopped: Container stopped
+    trigger-started: Container started
+    trigger-error: Error detected
+    trigger-unhealthy: Health check failed
+    trigger-restarted: Container restarted
+    trigger-oom-killed: OOM killed
     scan-alert: Scan Alert
     scan-severity: Minimum severity
     scan-package-types: Package types
@@ -302,10 +349,21 @@ notifications:
     type: Type
     webhook-title: HTTP Webhook
     webhook-description: Slack, Discord, custom endpoint
+    telegram-title: Telegram
+    telegram-description: Telegram bot message to a specific chat or thread
     cloud-title: Dozzle Cloud
     cloud-description: Push notifications, email alerts, and AI-powered summaries
     webhook-url: Webhook URL
     webhook-url-placeholder: https://hooks.foo.com/services/...
+    telegram-bot-token: Bot Token
+    telegram-chat-id: Chat ID
+    telegram-thread-id: Thread ID
+    telegram-parse-mode: Parse mode
+    telegram-no-parse-mode: None
+    telegram-template-placeholder: "{{ .Detail }}"
+    telegram-template-hint: Go template text. Supports .Container, .Detail, .Subscription and other notification fields.
+    shared-template: Shared template
+    no-shared-template: No shared template
     api-key: API Key
     payload-format: Payload Format
     format-slack: Slack

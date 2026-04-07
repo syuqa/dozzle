@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/amir20/dozzle/internal/container"
@@ -90,9 +91,7 @@ func (m *Manager) processLogEvent(logEvent *container.LogEvent) {
 		}
 
 		// Send to the subscription's dispatcher
-		if d, ok := m.dispatchers.Load(sub.DispatcherID); ok {
-			go m.sendNotification(d, notification, sub.DispatcherID)
-		}
+		go m.sendSubscriptionNotification(sub, notification)
 		return true
 	})
 }
@@ -177,9 +176,7 @@ func (m *Manager) processStatEvent(event *ContainerStatEvent) {
 			Timestamp: time.Now(),
 		}
 
-		if d, ok := m.dispatchers.Load(sub.DispatcherID); ok {
-			go m.sendNotification(d, notification, sub.DispatcherID)
-		}
+		go m.sendSubscriptionNotification(sub, notification)
 		return true
 	})
 }
@@ -195,6 +192,25 @@ func formatLogMessage(message any) string {
 		}
 		return string(b)
 	}
+}
+
+func (m *Manager) sendSubscriptionNotification(sub *Subscription, notification types.Notification) {
+	d, ok := m.dispatchers.Load(sub.DispatcherID)
+	if !ok {
+		return
+	}
+	templateText := m.resolveTemplate(sub.TemplateID, sub.Template)
+	if strings.TrimSpace(templateText) != "" {
+		if overrideCapable, ok := d.(dispatcher.TemplateOverrideCapable); ok {
+			override, err := overrideCapable.WithTemplate(templateText)
+			if err != nil {
+				log.Error().Err(err).Int("subscription", sub.ID).Msg("Failed to apply notification template override")
+				return
+			}
+			d = override
+		}
+	}
+	m.sendNotification(d, notification, sub.DispatcherID)
 }
 
 // sendNotification sends a notification using the dispatcher

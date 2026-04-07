@@ -50,6 +50,10 @@
           <mdi:shield-search class="mr-1" />
           {{ $t("notifications.alert-form.scan-alert") }}
         </button>
+        <button class="btn btn-sm" :class="alertType === 'state' ? 'btn-primary' : 'btn-outline'" @click="alertType = 'state'">
+          <mdi:cube-outline class="mr-1" />
+          {{ $t("notifications.alert-form.state-alert") }}
+        </button>
       </div>
     </fieldset>
 
@@ -103,6 +107,30 @@
       :is-loading="isLoading"
       :validate-preview="validatePreview"
     />
+    <div v-else-if="alertType === 'state'" class="space-y-4">
+      <fieldset class="fieldset">
+        <legend class="fieldset-legend text-lg">{{ $t("notifications.alert-form.state-triggers") }}</legend>
+        <div class="grid gap-3 md:grid-cols-2">
+          <label v-for="trigger in availableStateTriggers" :key="trigger.value" class="label cursor-pointer justify-start gap-3">
+            <input
+              :checked="stateTriggers.includes(trigger.value)"
+              type="checkbox"
+              class="checkbox checkbox-primary"
+              @change="toggleStateTrigger(trigger.value)"
+            />
+            <span class="label-text">{{ $t(trigger.label) }}</span>
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset class="fieldset">
+        <legend class="fieldset-legend text-lg">{{ $t("notifications.alert-form.state-holdoff-seconds") }}</legend>
+        <input v-model.number="stateHoldoffSeconds" type="number" min="0" step="1" class="input w-full" />
+        <p class="text-base-content/50 mt-1 text-xs">
+          {{ $t("notifications.alert-form.state-holdoff-hint") }}
+        </p>
+      </fieldset>
+    </div>
     <div v-else class="space-y-4">
       <fieldset class="fieldset">
         <legend class="fieldset-legend text-lg">{{ $t("notifications.alert-form.scan-severity") }}</legend>
@@ -158,6 +186,30 @@
       </fieldset>
     </div>
 
+    <fieldset class="fieldset">
+      <legend class="fieldset-legend text-lg">
+        {{ $t("notifications.alert-form.shared-template") }}
+      </legend>
+      <select v-model.number="selectedTemplateId" class="select w-full">
+        <option :value="0">{{ $t("notifications.alert-form.no-shared-template") }}</option>
+        <option v-for="item in templates" :key="item.id" :value="item.id">{{ item.name }}</option>
+      </select>
+    </fieldset>
+
+    <fieldset class="fieldset">
+      <legend class="fieldset-legend text-lg">
+        {{ $t("notifications.alert-form.template-override") }}
+      </legend>
+      <textarea
+        v-model="alertTemplate"
+        class="textarea textarea-bordered min-h-32 w-full font-mono text-sm"
+        :placeholder="$t('notifications.alert-form.template-override-placeholder')"
+      ></textarea>
+      <p class="text-base-content/50 mt-1 text-xs">
+        {{ $t("notifications.alert-form.template-override-hint") }}
+      </p>
+    </fieldset>
+
     <!-- Destination -->
     <fieldset class="fieldset">
       <legend class="fieldset-legend text-lg">{{ $t("notifications.alert-form.destination") }}</legend>
@@ -166,6 +218,7 @@
           <span class="flex items-center gap-2">
             <template v-if="selectedDestination">
               <mdi:webhook v-if="selectedDestination.type === 'webhook'" />
+              <mdi:telegram v-else-if="selectedDestination.type === 'telegram'" />
               <mdi:cloud v-else />
               {{ selectedDestination.name }}
             </template>
@@ -183,6 +236,7 @@
               :class="{ active: dispatcherId === dest.id }"
             >
               <mdi:webhook v-if="dest.type === 'webhook'" />
+              <mdi:telegram v-else-if="dest.type === 'telegram'" />
               <mdi:cloud v-else />
               {{ dest.name }}
             </a>
@@ -218,12 +272,13 @@ import config from "@/stores/config";
 import { useAlertForm } from "@/composable/alertForm";
 import LogAlertFields from "./LogAlertFields.vue";
 import MetricAlertFields from "./MetricAlertFields.vue";
-import type { NotificationRule, UnifiedAlert } from "@/types/notifications";
+import type { NotificationRule, NotificationTemplate, UnifiedAlert } from "@/types/notifications";
 
 const props = defineProps<{
   close?: () => void;
   onCreated?: () => void;
   alert?: UnifiedAlert;
+  templates?: NotificationTemplate[];
   prefill?: { name?: string; containerExpression?: string; logExpression?: string; metricExpression?: string };
 }>();
 
@@ -255,9 +310,28 @@ useFocus(alertNameInput, { initialValue: true });
 const standardAlert = computed<NotificationRule | undefined>(() =>
   props.alert && props.alert.type !== "scan" ? props.alert : undefined,
 );
-const alertType = ref<"log" | "metric" | "scan">(
-  props.alert?.type === "scan" ? "scan" : standardAlert.value?.metricExpression ? "metric" : "log",
+const alertType = ref<"log" | "metric" | "scan" | "state">(
+  props.alert?.type === "scan"
+    ? "scan"
+    : standardAlert.value?.stateTriggers?.length
+      ? "state"
+      : standardAlert.value?.metricExpression
+        ? "metric"
+        : "log",
 );
+const availableStateTriggers = [
+  { value: "image_updated", label: "notifications.alert-form.trigger-image-updated" },
+  { value: "stopped", label: "notifications.alert-form.trigger-stopped" },
+  { value: "started", label: "notifications.alert-form.trigger-started" },
+  { value: "error", label: "notifications.alert-form.trigger-error" },
+  { value: "unhealthy", label: "notifications.alert-form.trigger-unhealthy" },
+  { value: "restarted", label: "notifications.alert-form.trigger-restarted" },
+  { value: "oom_killed", label: "notifications.alert-form.trigger-oom-killed" },
+] as const;
+const stateTriggers = ref(props.alert?.type === "scan" ? [] : [...(standardAlert.value?.stateTriggers ?? [])]);
+const stateHoldoffSeconds = ref(props.alert?.type === "scan" ? 0 : standardAlert.value?.holdoffSeconds ?? 0);
+const alertTemplate = ref(props.alert?.template ?? "");
+const selectedTemplateId = ref(props.alert?.templateId ?? 0);
 const scanSeverity = ref(props.alert?.type === "scan" ? props.alert.minSeverity : "HIGH");
 const scanPackageTypes = ref(props.alert?.type === "scan" ? (props.alert.packageTypes ?? []).join(", ") : "");
 const scanScheduleEnabled = ref(props.alert?.type === "scan" ? props.alert.scheduleEnabled ?? false : false);
@@ -268,6 +342,7 @@ const scanNotifyOnManual = ref(props.alert?.type === "scan" ? props.alert.notify
 const canSave = computed(() => {
   if (!baseCanSave.value) return false;
   if (alertType.value === "scan") return true;
+  if (alertType.value === "state") return stateTriggers.value.length > 0;
   return fieldsRef.value?.canSave ?? false;
 });
 
@@ -284,11 +359,34 @@ async function save() {
       intervalMinutes: scanIntervalMinutes.value,
       cooldownMinutes: scanCooldownMinutes.value,
       notifyOnManual: scanNotifyOnManual.value,
+      templateId: selectedTemplateId.value || undefined,
+      template: alertTemplate.value.trim(),
+    });
+    return;
+  }
+  if (alertType.value === "state") {
+    await saveAlert("state", {
+      stateTriggers: [...stateTriggers.value],
+      holdoffSeconds: Math.max(0, stateHoldoffSeconds.value || 0),
+      templateId: selectedTemplateId.value || undefined,
+      template: alertTemplate.value.trim(),
     });
     return;
   }
   if (!fieldsRef.value) return;
-  await saveAlert(alertType.value, fieldsRef.value.typeFields);
+  await saveAlert(alertType.value, {
+    ...fieldsRef.value.typeFields,
+    templateId: selectedTemplateId.value || undefined,
+    template: alertTemplate.value.trim(),
+  });
+}
+
+function toggleStateTrigger(trigger: string) {
+  if (stateTriggers.value.includes(trigger)) {
+    stateTriggers.value = stateTriggers.value.filter((item) => item !== trigger);
+    return;
+  }
+  stateTriggers.value = [...stateTriggers.value, trigger];
 }
 
 // Container editor

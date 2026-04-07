@@ -30,6 +30,10 @@ type NotificationRuleResponse struct {
 	MetricExpression    string              `json:"metricExpression,omitempty"`
 	Cooldown            int                 `json:"cooldown,omitempty"`
 	SampleWindow        int                 `json:"sampleWindow,omitempty"`
+	StateTriggers       []string            `json:"stateTriggers,omitempty"`
+	HoldoffSeconds      int                 `json:"holdoffSeconds,omitempty"`
+	Template            string              `json:"template,omitempty"`
+	TemplateID          int                 `json:"templateId,omitempty"`
 	TriggerCount        int64               `json:"triggerCount"`
 	TriggeredContainers int                 `json:"triggeredContainers"`
 	LastTriggeredAt     *time.Time          `json:"lastTriggeredAt"`
@@ -37,50 +41,79 @@ type NotificationRuleResponse struct {
 }
 
 type DispatcherResponse struct {
-	ID        int                `json:"id"`
-	Name      string             `json:"name"`
-	Type      string             `json:"type"`
-	URL       *string            `json:"url,omitempty"`
-	Template  *string            `json:"template,omitempty"`
-	Headers   map[string]string `json:"headers,omitempty"`
-	Prefix    *string            `json:"prefix,omitempty"`
-	ExpiresAt *time.Time         `json:"expiresAt,omitempty"`
+	ID              int               `json:"id"`
+	Name            string            `json:"name"`
+	Type            string            `json:"type"`
+	URL             *string           `json:"url,omitempty"`
+	Template        *string           `json:"template,omitempty"`
+	TemplateID      int               `json:"templateId,omitempty"`
+	Headers         map[string]string `json:"headers,omitempty"`
+	Prefix          *string           `json:"prefix,omitempty"`
+	ExpiresAt       *time.Time        `json:"expiresAt,omitempty"`
+	BotToken        *string           `json:"botToken,omitempty"`
+	ChatID          *string           `json:"chatId,omitempty"`
+	MessageThreadID *string           `json:"messageThreadId,omitempty"`
+	ParseMode       *string           `json:"parseMode,omitempty"`
+}
+
+type NotificationTemplateResponse struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
+	Body string `json:"body"`
 }
 
 type NotificationRuleInput struct {
-	Name                string `json:"name"`
-	Enabled             bool   `json:"enabled"`
-	DispatcherID        int    `json:"dispatcherId"`
-	LogExpression       string `json:"logExpression"`
-	ContainerExpression string `json:"containerExpression"`
-	MetricExpression    string `json:"metricExpression,omitempty"`
-	Cooldown            int    `json:"cooldown,omitempty"`
-	SampleWindow        int    `json:"sampleWindow,omitempty"`
+	Name                string   `json:"name"`
+	Enabled             bool     `json:"enabled"`
+	DispatcherID        int      `json:"dispatcherId"`
+	LogExpression       string   `json:"logExpression"`
+	ContainerExpression string   `json:"containerExpression"`
+	MetricExpression    string   `json:"metricExpression,omitempty"`
+	Cooldown            int      `json:"cooldown,omitempty"`
+	SampleWindow        int      `json:"sampleWindow,omitempty"`
+	StateTriggers       []string `json:"stateTriggers,omitempty"`
+	HoldoffSeconds      int      `json:"holdoffSeconds,omitempty"`
+	Template            string   `json:"template,omitempty"`
+	TemplateID          int      `json:"templateId,omitempty"`
 }
 
 type NotificationRuleUpdateInput struct {
-	Name                *string `json:"name,omitempty"`
-	Enabled             *bool   `json:"enabled,omitempty"`
-	DispatcherID        *int    `json:"dispatcherId,omitempty"`
-	LogExpression       *string `json:"logExpression,omitempty"`
-	ContainerExpression *string `json:"containerExpression,omitempty"`
-	MetricExpression    *string `json:"metricExpression,omitempty"`
-	Cooldown            *int    `json:"cooldown,omitempty"`
-	SampleWindow        *int    `json:"sampleWindow,omitempty"`
+	Name                *string   `json:"name,omitempty"`
+	Enabled             *bool     `json:"enabled,omitempty"`
+	DispatcherID        *int      `json:"dispatcherId,omitempty"`
+	LogExpression       *string   `json:"logExpression,omitempty"`
+	ContainerExpression *string   `json:"containerExpression,omitempty"`
+	MetricExpression    *string   `json:"metricExpression,omitempty"`
+	Cooldown            *int      `json:"cooldown,omitempty"`
+	SampleWindow        *int      `json:"sampleWindow,omitempty"`
+	StateTriggers       *[]string `json:"stateTriggers,omitempty"`
+	HoldoffSeconds      *int      `json:"holdoffSeconds,omitempty"`
+	Template            *string   `json:"template,omitempty"`
+	TemplateID          *int      `json:"templateId,omitempty"`
 }
 
 type DispatcherInput struct {
-	Name     string            `json:"name"`
-	Type     string            `json:"type"`
-	URL      *string           `json:"url,omitempty"`
-	Template *string           `json:"template,omitempty"`
-	Headers  map[string]string `json:"headers,omitempty"`
+	Name            string            `json:"name"`
+	Type            string            `json:"type"`
+	URL             *string           `json:"url,omitempty"`
+	Template        *string           `json:"template,omitempty"`
+	TemplateID      int               `json:"templateId,omitempty"`
+	Headers         map[string]string `json:"headers,omitempty"`
+	BotToken        *string           `json:"botToken,omitempty"`
+	ChatID          *string           `json:"chatId,omitempty"`
+	MessageThreadID *string           `json:"messageThreadId,omitempty"`
+	ParseMode       *string           `json:"parseMode,omitempty"`
 }
 
 type PreviewInput struct {
 	ContainerExpression string  `json:"containerExpression"`
 	LogExpression       *string `json:"logExpression,omitempty"`
 	MetricExpression    *string `json:"metricExpression,omitempty"`
+}
+
+type NotificationTemplateInput struct {
+	Name string `json:"name"`
+	Body string `json:"body"`
 }
 
 type PreviewResult struct {
@@ -94,9 +127,15 @@ type PreviewResult struct {
 }
 
 type TestWebhookInput struct {
-	URL      string            `json:"url"`
-	Template *string           `json:"template,omitempty"`
-	Headers  map[string]string `json:"headers,omitempty"`
+	Type            string            `json:"type"`
+	URL             string            `json:"url,omitempty"`
+	Template        *string           `json:"template,omitempty"`
+	TemplateID      int               `json:"templateId,omitempty"`
+	Headers         map[string]string `json:"headers,omitempty"`
+	BotToken        *string           `json:"botToken,omitempty"`
+	ChatID          *string           `json:"chatId,omitempty"`
+	MessageThreadID *string           `json:"messageThreadId,omitempty"`
+	ParseMode       *string           `json:"parseMode,omitempty"`
 }
 
 type TestWebhookResult struct {
@@ -156,6 +195,10 @@ func subscriptionToResponse(sub *notification.Subscription, dispatchers []notifi
 		MetricExpression:    sub.MetricExpression,
 		Cooldown:            sub.Cooldown,
 		SampleWindow:        sub.SampleWindow,
+		StateTriggers:       append([]string(nil), sub.StateTriggers...),
+		HoldoffSeconds:      sub.HoldoffSeconds,
+		Template:            sub.Template,
+		TemplateID:          sub.TemplateID,
 		TriggerCount:        triggerCount,
 		LastTriggeredAt:     lastTriggeredAt,
 		TriggeredContainers: triggeredContainers,
@@ -179,15 +222,47 @@ func dispatcherConfigToResponse(d *notification.DispatcherConfig) *DispatcherRes
 	if d.Prefix != "" {
 		prefix = &d.Prefix
 	}
+	var botToken *string
+	if d.BotToken != "" {
+		botToken = &d.BotToken
+	}
+	var chatID *string
+	if d.ChatID != "" {
+		chatID = &d.ChatID
+	}
+	var messageThreadID *string
+	if d.MessageThreadID != "" {
+		messageThreadID = &d.MessageThreadID
+	}
+	var parseMode *string
+	if d.ParseMode != "" {
+		parseMode = &d.ParseMode
+	}
 	return &DispatcherResponse{
-		ID:        d.ID,
-		Name:      d.Name,
-		Type:      d.Type,
-		URL:       url,
-		Template:  template,
-		Headers:   headers,
-		Prefix:    prefix,
-		ExpiresAt: d.ExpiresAt,
+		ID:              d.ID,
+		Name:            d.Name,
+		Type:            d.Type,
+		URL:             url,
+		Template:        template,
+		TemplateID:      d.TemplateID,
+		Headers:         headers,
+		Prefix:          prefix,
+		ExpiresAt:       d.ExpiresAt,
+		BotToken:        botToken,
+		ChatID:          chatID,
+		MessageThreadID: messageThreadID,
+		ParseMode:       parseMode,
+	}
+}
+
+func templateToResponse(tmpl *notification.NotificationTemplate) *NotificationTemplateResponse {
+	if tmpl == nil {
+		return nil
+	}
+	return &NotificationTemplateResponse{
+		ID:   tmpl.ID,
+		Name: tmpl.Name,
+		Body: tmpl.Body,
 	}
 }
 
@@ -203,6 +278,13 @@ func writeError(w http.ResponseWriter, status int, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(map[string]string{"error": message})
+}
+
+func derefString(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
 }
 
 // Notification Rules handlers
@@ -251,6 +333,10 @@ func (h *handler) createNotificationRule(w http.ResponseWriter, r *http.Request)
 		MetricExpression:    input.MetricExpression,
 		Cooldown:            input.Cooldown,
 		SampleWindow:        input.SampleWindow,
+		StateTriggers:       input.StateTriggers,
+		HoldoffSeconds:      input.HoldoffSeconds,
+		Template:            input.Template,
+		TemplateID:          input.TemplateID,
 	}
 
 	if err := h.hostService.AddSubscription(sub); err != nil {
@@ -284,6 +370,10 @@ func (h *handler) replaceNotificationRule(w http.ResponseWriter, r *http.Request
 		MetricExpression:    input.MetricExpression,
 		Cooldown:            input.Cooldown,
 		SampleWindow:        input.SampleWindow,
+		StateTriggers:       input.StateTriggers,
+		HoldoffSeconds:      input.HoldoffSeconds,
+		Template:            input.Template,
+		TemplateID:          input.TemplateID,
 	}
 
 	if err := h.hostService.ReplaceSubscription(sub); err != nil {
@@ -331,6 +421,18 @@ func (h *handler) updateNotificationRule(w http.ResponseWriter, r *http.Request)
 	}
 	if input.SampleWindow != nil {
 		updates["sampleWindow"] = *input.SampleWindow
+	}
+	if input.StateTriggers != nil {
+		updates["stateTriggers"] = *input.StateTriggers
+	}
+	if input.HoldoffSeconds != nil {
+		updates["holdoffSeconds"] = *input.HoldoffSeconds
+	}
+	if input.Template != nil {
+		updates["template"] = *input.Template
+	}
+	if input.TemplateID != nil {
+		updates["templateId"] = *input.TemplateID
 	}
 
 	if err := h.hostService.UpdateSubscription(id, updates); err != nil {
@@ -395,36 +497,40 @@ func (h *handler) createDispatcher(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var d dispatcher.Dispatcher
-	switch input.Type {
-	case "webhook":
-		url := ""
-		if input.URL != nil {
-			url = *input.URL
-		}
-		templateStr := ""
-		if input.Template != nil {
-			templateStr = *input.Template
-		}
-		webhook, err := dispatcher.NewWebhookDispatcher(input.Name, url, templateStr, input.Headers)
-		if err != nil {
-			writeError(w, http.StatusBadRequest, err.Error())
-			return
-		}
-		d = webhook
-	default:
-		writeError(w, http.StatusBadRequest, "unknown dispatcher type")
+	config := notification.DispatcherConfig{
+		Name:            input.Name,
+		Type:            input.Type,
+		Headers:         input.Headers,
+		TemplateID:      input.TemplateID,
+		MessageThreadID: derefString(input.MessageThreadID),
+		ParseMode:       derefString(input.ParseMode),
+		BotToken:        derefString(input.BotToken),
+		ChatID:          derefString(input.ChatID),
+	}
+	if input.URL != nil {
+		config.URL = *input.URL
+	}
+	if input.Template != nil {
+		config.Template = *input.Template
+	}
+
+	id, err := h.hostService.AddDispatcher(config)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	id := h.hostService.AddDispatcher(d)
-
 	resp := &DispatcherResponse{
-		ID:       id,
-		Name:     input.Name,
-		Type:     input.Type,
-		URL:      input.URL,
-		Template: input.Template,
+		ID:              id,
+		Name:            input.Name,
+		Type:            input.Type,
+		URL:             input.URL,
+		Template:        input.Template,
+		TemplateID:      input.TemplateID,
+		BotToken:        input.BotToken,
+		ChatID:          input.ChatID,
+		MessageThreadID: input.MessageThreadID,
+		ParseMode:       input.ParseMode,
 	}
 	if len(input.Headers) > 0 {
 		resp.Headers = input.Headers
@@ -445,36 +551,40 @@ func (h *handler) updateDispatcher(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var d dispatcher.Dispatcher
-	switch input.Type {
-	case "webhook":
-		url := ""
-		if input.URL != nil {
-			url = *input.URL
-		}
-		templateStr := ""
-		if input.Template != nil {
-			templateStr = *input.Template
-		}
-		webhook, err := dispatcher.NewWebhookDispatcher(input.Name, url, templateStr, input.Headers)
-		if err != nil {
-			writeError(w, http.StatusBadRequest, err.Error())
-			return
-		}
-		d = webhook
-	default:
-		writeError(w, http.StatusBadRequest, "unknown dispatcher type")
+	config := notification.DispatcherConfig{
+		ID:              id,
+		Name:            input.Name,
+		Type:            input.Type,
+		Headers:         input.Headers,
+		TemplateID:      input.TemplateID,
+		MessageThreadID: derefString(input.MessageThreadID),
+		ParseMode:       derefString(input.ParseMode),
+		BotToken:        derefString(input.BotToken),
+		ChatID:          derefString(input.ChatID),
+	}
+	if input.URL != nil {
+		config.URL = *input.URL
+	}
+	if input.Template != nil {
+		config.Template = *input.Template
+	}
+
+	if err := h.hostService.UpdateDispatcher(id, config); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	h.hostService.UpdateDispatcher(id, d)
-
 	resp := &DispatcherResponse{
-		ID:       id,
-		Name:     input.Name,
-		Type:     input.Type,
-		URL:      input.URL,
-		Template: input.Template,
+		ID:              id,
+		Name:            input.Name,
+		Type:            input.Type,
+		URL:             input.URL,
+		Template:        input.Template,
+		TemplateID:      input.TemplateID,
+		BotToken:        input.BotToken,
+		ChatID:          input.ChatID,
+		MessageThreadID: input.MessageThreadID,
+		ParseMode:       input.ParseMode,
 	}
 	if len(input.Headers) > 0 {
 		resp.Headers = input.Headers
@@ -490,6 +600,60 @@ func (h *handler) deleteDispatcher(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.hostService.RemoveDispatcher(id)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *handler) listTemplates(w http.ResponseWriter, r *http.Request) {
+	templates := h.hostService.Templates()
+	result := make([]*NotificationTemplateResponse, 0, len(templates))
+	for _, tmpl := range templates {
+		result = append(result, templateToResponse(tmpl))
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (h *handler) createTemplate(w http.ResponseWriter, r *http.Request) {
+	var input NotificationTemplateInput
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	created := h.hostService.AddTemplate(&notification.NotificationTemplate{
+		Name: input.Name,
+		Body: input.Body,
+	})
+	writeJSON(w, http.StatusCreated, templateToResponse(created))
+}
+
+func (h *handler) updateTemplate(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(chi.URLParam(r, "id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	var input NotificationTemplateInput
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	updated, err := h.hostService.UpdateTemplate(id, &notification.NotificationTemplate{
+		Name: input.Name,
+		Body: input.Body,
+	})
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, templateToResponse(updated))
+}
+
+func (h *handler) deleteTemplate(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(chi.URLParam(r, "id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	h.hostService.DeleteTemplate(id)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -636,21 +800,6 @@ func (h *handler) testWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	templateStr := ""
-	if input.Template != nil {
-		templateStr = *input.Template
-	}
-
-	webhook, err := dispatcher.NewWebhookDispatcher("test", input.URL, templateStr, input.Headers)
-	if err != nil {
-		errStr := err.Error()
-		writeJSON(w, http.StatusOK, &TestWebhookResult{
-			Success: false,
-			Error:   &errStr,
-		})
-		return
-	}
-
 	mockNotification := types.Notification{
 		ID:        "test-notification",
 		Type:      types.LogNotification,
@@ -676,23 +825,80 @@ func (h *handler) testWebhook(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
-	result := webhook.SendTest(r.Context(), mockNotification)
-
-	var statusCode *int
-	if result.StatusCode > 0 {
-		statusCode = &result.StatusCode
+	var result TestWebhookResult
+	resolveTemplate := func(templateID int, inline string) string {
+		if templateID <= 0 {
+			return inline
+		}
+		for _, tmpl := range h.hostService.Templates() {
+			if tmpl.ID == templateID {
+				return tmpl.Body
+			}
+		}
+		return inline
 	}
-
-	var errStr *string
-	if result.Error != "" {
-		errStr = &result.Error
+	switch input.Type {
+	case "", "webhook":
+		templateStr := ""
+		if input.Template != nil {
+			templateStr = *input.Template
+		}
+		templateStr = resolveTemplate(input.TemplateID, templateStr)
+		webhook, err := dispatcher.NewWebhookDispatcher("test", input.URL, templateStr, input.Headers)
+		if err != nil {
+			errStr := err.Error()
+			writeJSON(w, http.StatusOK, &TestWebhookResult{Success: false, Error: &errStr})
+			return
+		}
+		webhookResult := webhook.SendTest(r.Context(), mockNotification)
+		result.Success = webhookResult.Success
+		if webhookResult.StatusCode > 0 {
+			result.StatusCode = &webhookResult.StatusCode
+		}
+		if webhookResult.Error != "" {
+			result.Error = &webhookResult.Error
+		}
+	case "telegram":
+		templateStr := ""
+		if input.Template != nil {
+			templateStr = *input.Template
+		}
+		templateStr = resolveTemplate(input.TemplateID, templateStr)
+		botToken := ""
+		if input.BotToken != nil {
+			botToken = *input.BotToken
+		}
+		chatID := ""
+		if input.ChatID != nil {
+			chatID = *input.ChatID
+		}
+		threadID := ""
+		if input.MessageThreadID != nil {
+			threadID = *input.MessageThreadID
+		}
+		parseMode := ""
+		if input.ParseMode != nil {
+			parseMode = *input.ParseMode
+		}
+		d, err := dispatcher.NewTelegramDispatcher("test", botToken, chatID, threadID, parseMode, templateStr)
+		if err != nil {
+			errStr := err.Error()
+			writeJSON(w, http.StatusOK, &TestWebhookResult{Success: false, Error: &errStr})
+			return
+		}
+		if err := d.Send(r.Context(), mockNotification); err != nil {
+			errStr := err.Error()
+			result.Success = false
+			result.Error = &errStr
+		} else {
+			result.Success = true
+		}
+	default:
+		errStr := "unknown dispatcher type"
+		writeJSON(w, http.StatusOK, &TestWebhookResult{Success: false, Error: &errStr})
+		return
 	}
-
-	writeJSON(w, http.StatusOK, &TestWebhookResult{
-		Success:    result.Success,
-		StatusCode: statusCode,
-		Error:      errStr,
-	})
+	writeJSON(w, http.StatusOK, &result)
 }
 
 // Releases handler

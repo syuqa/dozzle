@@ -11,7 +11,6 @@ import (
 	"github.com/amir20/dozzle/internal/auth"
 	"github.com/amir20/dozzle/internal/container"
 	"github.com/amir20/dozzle/internal/notification"
-	"github.com/amir20/dozzle/internal/notification/dispatcher"
 	container_support "github.com/amir20/dozzle/internal/support/container"
 	"github.com/amir20/dozzle/internal/trivy"
 	"github.com/amir20/dozzle/types"
@@ -91,10 +90,14 @@ type HostService interface {
 	ReplaceSubscription(sub *notification.Subscription) error
 	UpdateSubscription(id int, updates map[string]any) error
 	Subscriptions() []*notification.Subscription
-	AddDispatcher(d dispatcher.Dispatcher) int
-	UpdateDispatcher(id int, d dispatcher.Dispatcher)
+	AddDispatcher(config notification.DispatcherConfig) (int, error)
+	UpdateDispatcher(id int, config notification.DispatcherConfig) error
 	RemoveDispatcher(id int)
 	Dispatchers() []notification.DispatcherConfig
+	Templates() []*notification.NotificationTemplate
+	AddTemplate(tmpl *notification.NotificationTemplate) *notification.NotificationTemplate
+	UpdateTemplate(id int, tmpl *notification.NotificationTemplate) (*notification.NotificationTemplate, error)
+	DeleteTemplate(id int)
 	FetchAgentNotificationStats() map[int]types.SubscriptionStats
 }
 
@@ -202,6 +205,11 @@ func createRouter(h *handler) *chi.Mux {
 					r.Get("/dispatchers/{id}", h.getDispatcher)
 					r.Put("/dispatchers/{id}", h.updateDispatcher)
 					r.Delete("/dispatchers/{id}", h.deleteDispatcher)
+
+					r.Get("/templates", h.listTemplates)
+					r.Post("/templates", h.createTemplate)
+					r.Put("/templates/{id}", h.updateTemplate)
+					r.Delete("/templates/{id}", h.deleteTemplate)
 
 					r.Post("/preview", h.previewExpression)
 					r.Post("/test-webhook", h.testWebhook)

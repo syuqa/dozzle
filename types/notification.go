@@ -9,6 +9,7 @@ const (
 	LogNotification    NotificationType = "log"
 	MetricNotification NotificationType = "metric"
 	ScanNotification   NotificationType = "scan"
+	StateNotification  NotificationType = "state"
 )
 
 // Notification represents a notification event that can be filtered and sent
@@ -20,6 +21,7 @@ type Notification struct {
 	Log          *NotificationLog      `json:"log,omitempty"`
 	Stat         *NotificationStat     `json:"stat,omitempty"`
 	Scan         *NotificationScan     `json:"scan,omitempty"`
+	State        *NotificationState    `json:"state,omitempty"`
 	Subscription SubscriptionConfig    `json:"subscription"`
 	Timestamp    time.Time             `json:"timestamp"`
 }
@@ -83,17 +85,33 @@ type NotificationScanVulnerability struct {
 	FixedVersion     string `json:"fixedVersion,omitempty"`
 }
 
+// NotificationState represents container lifecycle or health change details.
+type NotificationState struct {
+	Trigger       string            `json:"trigger"`
+	Event         string            `json:"event,omitempty"`
+	PreviousState string            `json:"previousState,omitempty"`
+	CurrentState  string            `json:"currentState,omitempty"`
+	PreviousImage string            `json:"previousImage,omitempty"`
+	CurrentImage  string            `json:"currentImage,omitempty"`
+	ExitCode      string            `json:"exitCode,omitempty"`
+	Attributes    map[string]string `json:"attributes,omitempty"`
+}
+
 // SubscriptionConfig represents a notification subscription configuration
 type SubscriptionConfig struct {
-	ID                  int    `json:"id"`
-	Name                string `json:"name"`
-	Enabled             bool   `json:"-"`
-	DispatcherID        int    `json:"-"`
-	LogExpression       string `json:"logExpression,omitempty"`
-	ContainerExpression string `json:"containerExpression"`
-	MetricExpression    string `json:"metricExpression,omitempty"`
-	Cooldown            int    `json:"cooldown,omitempty"`
-	SampleWindow        int    `json:"sampleWindow,omitempty"`
+	ID                  int      `json:"id"`
+	Name                string   `json:"name"`
+	Enabled             bool     `json:"-"`
+	DispatcherID        int      `json:"-"`
+	LogExpression       string   `json:"logExpression,omitempty"`
+	ContainerExpression string   `json:"containerExpression"`
+	MetricExpression    string   `json:"metricExpression,omitempty"`
+	Cooldown            int      `json:"cooldown,omitempty"`
+	SampleWindow        int      `json:"sampleWindow,omitempty"`
+	StateTriggers       []string `json:"stateTriggers,omitempty"`
+	HoldoffSeconds      int      `json:"holdoffSeconds,omitempty"`
+	Template            string   `json:"template,omitempty"`
+	TemplateID          int      `json:"templateId,omitempty"`
 }
 
 // SubscriptionStats represents runtime stats for a notification subscription
@@ -106,13 +124,24 @@ type SubscriptionStats struct {
 
 // DispatcherConfig represents a notification dispatcher configuration
 type DispatcherConfig struct {
-	ID        int
-	Name      string
-	Type      string
-	URL       string
-	Template  string
-	Headers   map[string]string
-	APIKey    string
-	Prefix    string
-	ExpiresAt *time.Time
+	ID              int
+	Name            string
+	Type            string
+	URL             string
+	Template        string
+	TemplateID      int
+	Headers         map[string]string
+	APIKey          string
+	Prefix          string
+	ExpiresAt       *time.Time
+	BotToken        string
+	ChatID          string
+	MessageThreadID string
+	ParseMode       string
+}
+
+type NotificationTemplate struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
+	Body string `json:"body"`
 }

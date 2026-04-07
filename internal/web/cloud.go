@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/amir20/dozzle/internal/notification"
 	"github.com/amir20/dozzle/internal/notification/dispatcher"
 	"github.com/rs/zerolog/log"
 )
@@ -84,14 +85,18 @@ func (h *handler) cloudCallback(w http.ResponseWriter, r *http.Request) {
 
 	name := "Dozzle Cloud"
 
-	cloudDispatcher, err := dispatcher.NewCloudDispatcher(name, tokenResp.Key, tokenResp.Prefix, expiresAt)
+	id, err := h.hostService.AddDispatcher(notification.DispatcherConfig{
+		Name:      name,
+		Type:      "cloud",
+		APIKey:    tokenResp.Key,
+		Prefix:    tokenResp.Prefix,
+		ExpiresAt: expiresAt,
+	})
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to create cloud dispatcher")
 		http.Error(w, "failed to create cloud dispatcher", http.StatusInternalServerError)
 		return
 	}
-
-	id := h.hostService.AddDispatcher(cloudDispatcher)
 
 	base := h.config.Base
 	if base == "/" {

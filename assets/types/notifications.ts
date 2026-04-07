@@ -1,6 +1,6 @@
 export interface NotificationRule {
   id: number;
-  type?: "log" | "metric";
+  type?: "log" | "metric" | "state";
   name: string;
   enabled: boolean;
   containerExpression: string;
@@ -8,6 +8,10 @@ export interface NotificationRule {
   metricExpression?: string;
   cooldown?: number;
   sampleWindow?: number;
+  stateTriggers?: string[];
+  holdoffSeconds?: number;
+  template?: string;
+  templateId?: number;
   triggerCount: number;
   triggeredContainers: number;
   lastTriggeredAt: string | null;
@@ -33,6 +37,8 @@ export interface ScanAlert extends UnifiedAlertBase {
   intervalMinutes?: number;
   cooldownMinutes?: number;
   notifyOnManual?: boolean;
+  template?: string;
+  templateId?: number;
   triggeredContainers: number;
   lastDispatchAt?: string | null;
   lastDispatchError?: string;
@@ -46,9 +52,20 @@ export interface Dispatcher {
   type: string;
   url?: string;
   template?: string;
+  templateId?: number;
   headers?: Record<string, string>;
   prefix?: string;
   expiresAt?: string;
+  botToken?: string;
+  chatId?: string;
+  messageThreadId?: string;
+  parseMode?: string;
+}
+
+export interface NotificationTemplate {
+  id: number;
+  name: string;
+  body: string;
 }
 
 export interface NotificationRuleInput {
@@ -60,6 +77,8 @@ export interface NotificationRuleInput {
   metricExpression?: string;
   cooldown?: number;
   sampleWindow?: number;
+  template?: string;
+  templateId?: number;
 }
 
 export interface PreviewResult {

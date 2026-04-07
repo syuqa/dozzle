@@ -4,6 +4,7 @@
       <div class="flex items-start gap-3">
         <div class="flex h-10 w-10 items-center justify-center rounded-lg">
           <mdi:webhook v-if="destination.type === 'webhook'" class="text-lg" />
+          <mdi:telegram v-else-if="destination.type === 'telegram'" class="text-lg" />
           <mdi:cloud v-else class="text-primary-content text-lg" />
         </div>
         <div class="flex-1">
@@ -12,6 +13,8 @@
             {{
               destination.type === "webhook"
                 ? $t("notifications.destination.http-webhook")
+                : destination.type === "telegram"
+                  ? $t("notifications.destination.telegram")
                 : $t("notifications.destination.dozzle-cloud")
             }}
           </p>
@@ -38,13 +41,14 @@
 </template>
 
 <script lang="ts" setup>
-import type { Dispatcher } from "@/types/notifications";
+import type { Dispatcher, NotificationTemplate } from "@/types/notifications";
 import DestinationForm from "./DestinationForm.vue";
 
-const { destination, onUpdated, existingDispatchers } = defineProps<{
+const { destination, onUpdated, existingDispatchers, templates = [] } = defineProps<{
   destination: Dispatcher;
   onUpdated?: () => void;
   existingDispatchers: Dispatcher[];
+  templates?: NotificationTemplate[];
 }>();
 
 const showDrawer = useDrawer();
@@ -56,6 +60,7 @@ function editDestination() {
       destination,
       onCreated: onUpdated,
       existingDispatchers,
+      templates,
     },
     "md",
   );
