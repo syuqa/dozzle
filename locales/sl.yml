@@ -15,6 +15,12 @@ toolbar:
   copy-filtered-logs: Kopiraj filtrirane dnevnike
   copying-logs: Kopiranje dnevnikov...
   restart: Ponovni zagon
+  update: Posodobi
+  update-service: Posodobi Storitev
+  update-pulling: Prenašanje najnovejše slike...
+  update-recreating: Ponovno ustvarjanje zabojnika...
+  update-done: Zabojnik uspešno posodobljen
+  update-up-to-date: Že posodobljen
   show-hostname: Prikaži ime gostitelja
 action:
   copy-log: Kopiraj dnevnik
@@ -67,6 +73,13 @@ error:
     message: Časovna omejitev uporabniškega vmesnika Dozzle je potekla med
       povezovanjem z API-jem. Preverite omrežno povezavo in poskusite znova.
   container-not-found: Zabojnika ni bilo mogoče najti
+  action-failed: Dejanje Neuspešno
+  update-failed: Posodobitev Neuspešna
+  unable-to-complete-action: Dejanja ni mogoče dokončati
+  invalid-action: Neveljavno dejanje
+  unable-to-update: Zabojnika ni mogoče posodobiti
+  something-went-wrong: Nekaj je šlo narobe
+  unknown-error: Neznana napaka
 alert:
   redirected:
     title: Preusmerjeno v nov zabojnik
@@ -172,6 +185,7 @@ notifications:
   destinations: Cilji
   add-destination: Dodaj cilj
   alerts: Opozorila
+  add-alert: Dodaj opozorilo
   add: Dodaj
   filter:
     all: Vsi ({count})
@@ -183,6 +197,7 @@ notifications:
     containers: Zabojniki
     log-filter: Filter dnevnika
     metric-filter: Metrika
+    event-filter: Event
     cooldown: Čas mirovanja
     sample-window: Vzorčno okno
     destination: Cilj
@@ -221,9 +236,13 @@ notifications:
     sample-window-hint: "Opozorilo se sproži, ko je pogoj izpolnjen za {duration}"
     cooldown-label: Čas mirovanja
     cooldown-hint: "{duration} med opozorili na zabojnik"
+    no-cooldown: No cooldown
     alert-type: Vrsta opozorila
     log-alert: Opozorilo dnevnika
     metric-alert: Opozorilo metrike
+    event-alert: Event Alert
+    event-filter: Event Expression
+    event-fields-hint: "Available fields: {fields}"
   destination-form:
     create-title: Dodaj Cilj
     edit-title: Uredi Cilj

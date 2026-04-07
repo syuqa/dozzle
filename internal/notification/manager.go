@@ -101,6 +101,7 @@ func (m *Manager) AddSubscription(sub *Subscription) error {
 	sub.MetricCooldowns = xsync.NewMap[string, time.Time]()
 	sub.MetricSampleBuffers = xsync.NewMap[string, *utils.RingBuffer[bool]]()
 	sub.StateCooldowns = xsync.NewMap[string, time.Time]()
+	sub.EventCooldowns = xsync.NewMap[string, time.Time]()
 
 	if err := sub.CompileExpressions(); err != nil {
 		return err
@@ -131,6 +132,7 @@ func (m *Manager) ReplaceSubscription(sub *Subscription) error {
 	sub.MetricCooldowns = xsync.NewMap[string, time.Time]()
 	sub.MetricSampleBuffers = xsync.NewMap[string, *utils.RingBuffer[bool]]()
 	sub.StateCooldowns = xsync.NewMap[string, time.Time]()
+	sub.EventCooldowns = xsync.NewMap[string, time.Time]()
 
 	if err := sub.CompileExpressions(); err != nil {
 		return err
@@ -175,6 +177,8 @@ func (m *Manager) UpdateSubscription(id int, updates map[string]any) error {
 			LogProgram:            sub.LogProgram,
 			MetricExpression:      sub.MetricExpression,
 			MetricProgram:         sub.MetricProgram,
+			EventExpression:       sub.EventExpression,
+			EventProgram:          sub.EventProgram,
 			Cooldown:              sub.Cooldown,
 			SampleWindow:          sub.SampleWindow,
 			StateTriggers:         append([]string(nil), sub.StateTriggers...),
@@ -183,6 +187,7 @@ func (m *Manager) UpdateSubscription(id int, updates map[string]any) error {
 			TemplateID:            sub.TemplateID,
 			MetricCooldowns:       sub.MetricCooldowns,
 			StateCooldowns:        sub.StateCooldowns,
+			EventCooldowns:        sub.EventCooldowns,
 			MetricSampleBuffers:   sub.MetricSampleBuffers,
 			TriggeredContainerIDs: sub.TriggeredContainerIDs,
 		}
@@ -246,6 +251,21 @@ func (m *Manager) UpdateSubscription(id int, updates map[string]any) error {
 						updated.MetricProgram = nil
 					}
 				}
+			case "eventExpression":
+				if exprStr, ok := value.(string); ok {
+					if exprStr != "" {
+						program, err := expr.Compile(exprStr, expr.Env(types.NotificationEvent{}))
+						if err != nil {
+							updateErr = fmt.Errorf("failed to compile event expression: %w", err)
+							return nil, xsync.CancelOp
+						}
+						updated.EventExpression = exprStr
+						updated.EventProgram = program
+					} else {
+						updated.EventExpression = ""
+						updated.EventProgram = nil
+					}
+				}
 			case "cooldown":
 				if cd, ok := value.(int); ok {
 					updated.Cooldown = cd
@@ -302,9 +322,19 @@ func (m *Manager) updateListeners() {
 	m.listener.UpdateStreams()
 
 	hasMetric := false
+	hasEvent := false
+	hasState := false
 	m.subscriptions.Range(func(_ int, sub *Subscription) bool {
 		if sub.Enabled && sub.IsMetricAlert() {
 			hasMetric = true
+		}
+		if sub.Enabled && sub.IsEventAlert() {
+			hasEvent = true
+		}
+		if sub.Enabled && sub.IsStateAlert() {
+			hasState = true
+		}
+		if hasMetric && hasEvent && hasState {
 			return false
 		}
 		return true
@@ -314,6 +344,12 @@ func (m *Manager) updateListeners() {
 		m.statsListener.Start()
 	} else {
 		m.statsListener.Stop()
+	}
+
+	if hasEvent || hasState {
+		m.eventListener.Start()
+	} else {
+		m.eventListener.Stop()
 	}
 }
 

@@ -72,18 +72,35 @@ func (m *Manager) processContainerEvent(envelope *ContainerEventEnvelope) {
 	}
 
 	notificationContainer := FromContainerModel(current, host)
+	notificationEvent := types.NotificationEvent{
+		Name:       envelope.Event.Name,
+		ActorID:    envelope.Event.ActorID,
+		Attributes: envelope.Event.ActorAttributes,
+		Timestamp:  envelope.Event.Time,
+	}
 	m.subscriptions.Range(func(_ int, sub *Subscription) bool {
-		if !sub.Enabled || !sub.IsStateAlert() {
+		if !sub.Enabled {
 			return true
 		}
 		if !sub.MatchesContainer(notificationContainer) {
 			return true
 		}
 
-		triggered := detectStateTriggers(previous, current, envelope.Event)
-		for _, trigger := range sub.StateTriggers {
-			if payload, ok := triggered[trigger]; ok {
-				m.queueStateAlert(sub, current, host, payload)
+		if sub.IsEventAlert() {
+			if sub.MatchesEvent(notificationEvent) && !sub.IsEventCooldownActive(envelope.Event.ActorID) {
+				if sub.Cooldown > 0 {
+					sub.SetEventCooldown(envelope.Event.ActorID)
+				}
+				m.fireEventAlert(sub, current, host, notificationEvent)
+			}
+		}
+
+		if sub.IsStateAlert() {
+			triggered := detectStateTriggers(previous, current, envelope.Event)
+			for _, trigger := range sub.StateTriggers {
+				if payload, ok := triggered[trigger]; ok {
+					m.queueStateAlert(sub, current, host, payload)
+				}
 			}
 		}
 
@@ -267,6 +284,40 @@ func (m *Manager) fireStateAlert(sub *Subscription, current container.Container,
 			HoldoffSeconds:      sub.HoldoffSeconds,
 		},
 		Timestamp: now,
+	}
+
+	go m.sendSubscriptionNotification(sub, notification)
+}
+
+func (m *Manager) fireEventAlert(sub *Subscription, current container.Container, host container.Host, event types.NotificationEvent) {
+	sub.AddTriggeredContainer(current.ID)
+	sub.TriggerCount.Add(1)
+	now := time.Now()
+	sub.LastTriggeredAt.Store(&now)
+
+	detail := fmt.Sprintf("Container event: %s", event.Name)
+	if exitCode, ok := event.Attributes["exitCode"]; ok && event.Name == "die" {
+		detail = fmt.Sprintf("Container event: %s (exit code %s)", event.Name, exitCode)
+	}
+
+	notification := types.Notification{
+		ID:        fmt.Sprintf("%s-event-%d", current.ID, time.Now().UnixNano()),
+		Type:      types.EventNotification,
+		Detail:    detail,
+		Container: FromContainerModel(current, host),
+		Event:     &event,
+		Subscription: types.SubscriptionConfig{
+			ID:                  sub.ID,
+			Name:                sub.Name,
+			Enabled:             sub.Enabled,
+			DispatcherID:        sub.DispatcherID,
+			EventExpression:     sub.EventExpression,
+			ContainerExpression: sub.ContainerExpression,
+			Cooldown:            sub.Cooldown,
+			Template:            sub.Template,
+			TemplateID:          sub.TemplateID,
+		},
+		Timestamp: time.Now(),
 	}
 
 	go m.sendSubscriptionNotification(sub, notification)

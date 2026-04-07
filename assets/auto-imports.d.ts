@@ -29,6 +29,7 @@ declare global {
   const createApp: typeof import('vue').createApp
   const createContainerHints: typeof import('./composable/exprEditor').createContainerHints
   const createDrawer: typeof import('./composable/drawer').createDrawer
+  const createEventHints: typeof import('./composable/exprEditor').createEventHints
   const createEventHook: typeof import('@vueuse/core').createEventHook
   const createExprEditor: typeof import('./composable/exprEditor').createExprEditor
   const createGlobalState: typeof import('@vueuse/core').createGlobalState
@@ -80,7 +81,7 @@ declare global {
   const isRef: typeof import('vue').isRef
   const isShallow: typeof import('vue').isShallow
   const lightTheme: typeof import('./stores/settings').lightTheme
-  const loadBetween: typeof import('./composable/eventStreams').loadBetween
+  const loadBetween: typeof import('./composable/loadBetween').loadBetween
   const locale: typeof import('./stores/settings').locale
   const loggingContextKey: typeof import('./composable/logContext').loggingContextKey
   const makeDestructurable: typeof import('@vueuse/core').makeDestructurable
@@ -113,6 +114,7 @@ declare global {
   const onUnmounted: typeof import('vue').onUnmounted
   const onUpdated: typeof import('vue').onUpdated
   const onWatcherCleanup: typeof import('vue').onWatcherCleanup
+  const parseMessage: typeof import('./composable/loadBetween').parseMessage
   const pausableWatch: typeof import('@vueuse/core').pausableWatch
   const persistentVisibleKeysForContainer: typeof import('./composable/storage').persistentVisibleKeysForContainer
   const pinnedContainers: typeof import('./composable/storage').pinnedContainers
@@ -241,6 +243,7 @@ declare global {
   const useEventListener: typeof import('@vueuse/core').useEventListener
   const useEventSource: typeof import('@vueuse/core').useEventSource
   const useExponentialMovingAverage: typeof import('./utils/index').useExponentialMovingAverage
+  const useExprEditorField: typeof import('./composable/useExprEditorField').useExprEditorField
   const useEyeDropper: typeof import('@vueuse/core').useEyeDropper
   const useFavicon: typeof import('@vueuse/core').useFavicon
   const useFetch: typeof import('@vueuse/core').useFetch
@@ -270,6 +273,7 @@ declare global {
   const useLastChanged: typeof import('@vueuse/core').useLastChanged
   const useLink: typeof import('vue-router/auto').useLink
   const useLocalStorage: typeof import('@vueuse/core').useLocalStorage
+  const useLogLoader: typeof import('./composable/logLoader').useLogLoader
   const useLoggingContext: typeof import('./composable/logContext').useLoggingContext
   const useMagicKeys: typeof import('@vueuse/core').useMagicKeys
   const useManualRefHistory: typeof import('@vueuse/core').useManualRefHistory
@@ -454,6 +458,7 @@ declare module 'vue' {
     readonly createApp: UnwrapRef<typeof import('vue')['createApp']>
     readonly createContainerHints: UnwrapRef<typeof import('./composable/exprEditor')['createContainerHints']>
     readonly createDrawer: UnwrapRef<typeof import('./composable/drawer')['createDrawer']>
+    readonly createEventHints: UnwrapRef<typeof import('./composable/exprEditor')['createEventHints']>
     readonly createEventHook: UnwrapRef<typeof import('@vueuse/core')['createEventHook']>
     readonly createExprEditor: UnwrapRef<typeof import('./composable/exprEditor')['createExprEditor']>
     readonly createGlobalState: UnwrapRef<typeof import('@vueuse/core')['createGlobalState']>
@@ -505,7 +510,7 @@ declare module 'vue' {
     readonly isRef: UnwrapRef<typeof import('vue')['isRef']>
     readonly isShallow: UnwrapRef<typeof import('vue')['isShallow']>
     readonly lightTheme: UnwrapRef<typeof import('./stores/settings')['lightTheme']>
-    readonly loadBetween: UnwrapRef<typeof import('./composable/eventStreams')['loadBetween']>
+    readonly loadBetween: UnwrapRef<typeof import('./composable/loadBetween')['loadBetween']>
     readonly locale: UnwrapRef<typeof import('./stores/settings')['locale']>
     readonly loggingContextKey: UnwrapRef<typeof import('./composable/logContext')['loggingContextKey']>
     readonly makeDestructurable: UnwrapRef<typeof import('@vueuse/core')['makeDestructurable']>
@@ -538,6 +543,7 @@ declare module 'vue' {
     readonly onUnmounted: UnwrapRef<typeof import('vue')['onUnmounted']>
     readonly onUpdated: UnwrapRef<typeof import('vue')['onUpdated']>
     readonly onWatcherCleanup: UnwrapRef<typeof import('vue')['onWatcherCleanup']>
+    readonly parseMessage: UnwrapRef<typeof import('./composable/loadBetween')['parseMessage']>
     readonly pausableWatch: UnwrapRef<typeof import('@vueuse/core')['pausableWatch']>
     readonly persistentVisibleKeysForContainer: UnwrapRef<typeof import('./composable/storage')['persistentVisibleKeysForContainer']>
     readonly pinnedContainers: UnwrapRef<typeof import('./composable/storage')['pinnedContainers']>
@@ -666,6 +672,7 @@ declare module 'vue' {
     readonly useEventListener: UnwrapRef<typeof import('@vueuse/core')['useEventListener']>
     readonly useEventSource: UnwrapRef<typeof import('@vueuse/core')['useEventSource']>
     readonly useExponentialMovingAverage: UnwrapRef<typeof import('./utils/index')['useExponentialMovingAverage']>
+    readonly useExprEditorField: UnwrapRef<typeof import('./composable/useExprEditorField')['useExprEditorField']>
     readonly useEyeDropper: UnwrapRef<typeof import('@vueuse/core')['useEyeDropper']>
     readonly useFavicon: UnwrapRef<typeof import('@vueuse/core')['useFavicon']>
     readonly useFetch: UnwrapRef<typeof import('@vueuse/core')['useFetch']>
@@ -695,6 +702,7 @@ declare module 'vue' {
     readonly useLastChanged: UnwrapRef<typeof import('@vueuse/core')['useLastChanged']>
     readonly useLink: UnwrapRef<typeof import('vue-router/auto')['useLink']>
     readonly useLocalStorage: UnwrapRef<typeof import('@vueuse/core')['useLocalStorage']>
+    readonly useLogLoader: UnwrapRef<typeof import('./composable/logLoader')['useLogLoader']>
     readonly useLoggingContext: UnwrapRef<typeof import('./composable/logContext')['useLoggingContext']>
     readonly useMagicKeys: UnwrapRef<typeof import('@vueuse/core')['useMagicKeys']>
     readonly useManualRefHistory: UnwrapRef<typeof import('@vueuse/core')['useManualRefHistory']>

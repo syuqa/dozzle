@@ -17,8 +17,12 @@ import (
 	docker "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/events"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/image"
+	"github.com/docker/docker/api/types/network"
+	"github.com/docker/docker/api/types/swarm"
 	"github.com/docker/docker/api/types/system"
 	"github.com/docker/docker/client"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/rs/zerolog/log"
 )
@@ -38,6 +42,11 @@ type DockerCLI interface {
 	ContainerExecAttach(ctx context.Context, execID string, config docker.ExecAttachOptions) (types.HijackedResponse, error)
 	ContainerExecResize(ctx context.Context, execID string, options docker.ResizeOptions) error
 	Info(ctx context.Context) (system.Info, error)
+	ImagePull(ctx context.Context, refStr string, options image.PullOptions) (io.ReadCloser, error)
+	ContainerRemove(ctx context.Context, containerID string, options docker.RemoveOptions) error
+	ContainerCreate(ctx context.Context, config *docker.Config, hostConfig *docker.HostConfig, networkingConfig *network.NetworkingConfig, platform *ocispec.Platform, containerName string) (docker.CreateResponse, error)
+	ServiceInspectWithRaw(ctx context.Context, serviceID string, opts swarm.ServiceInspectOptions) (swarm.Service, []byte, error)
+	ServiceUpdate(ctx context.Context, serviceID string, version swarm.Version, service swarm.ServiceSpec, opts swarm.ServiceUpdateOptions) (swarm.ServiceUpdateResponse, error)
 }
 
 type DockerClient struct {
@@ -147,6 +156,67 @@ func (d *DockerClient) ContainerActions(ctx context.Context, action container.Co
 	default:
 		return fmt.Errorf("unknown action: %s", action)
 	}
+}
+
+func (d *DockerClient) ImagePull(ctx context.Context, imageName string) (io.ReadCloser, error) {
+	return d.cli.ImagePull(ctx, imageName, image.PullOptions{})
+}
+
+func (d *DockerClient) ContainerInspect(ctx context.Context, containerID string) (docker.InspectResponse, error) {
+	return d.cli.ContainerInspect(ctx, containerID)
+}
+
+func (d *DockerClient) ContainerRemove(ctx context.Context, containerID string) error {
+	return d.cli.ContainerRemove(ctx, containerID, docker.RemoveOptions{})
+}
+
+func (d *DockerClient) ContainerCreate(ctx context.Context, inspectResp docker.InspectResponse, name string) (string, error) {
+	// Clear hostname when using network modes that don't support it (host, container:*)
+	// Docker always populates Hostname in inspect responses, but rejects it on create
+	// for these network modes.
+	if inspectResp.HostConfig != nil {
+		mode := string(inspectResp.HostConfig.NetworkMode)
+		if mode == "host" || strings.HasPrefix(mode, "container:") {
+			inspectResp.Config.Hostname = ""
+		}
+	}
+
+	// Build clean EndpointsConfig with only network names and aliases,
+	// stripping runtime state (IPs, gateways, MAC addresses) that can
+	// cause conflicts when recreating.
+	var networkingConfig *network.NetworkingConfig
+	if inspectResp.NetworkSettings != nil && len(inspectResp.NetworkSettings.Networks) > 0 {
+		endpointsConfig := make(map[string]*network.EndpointSettings, len(inspectResp.NetworkSettings.Networks))
+		for netName, ep := range inspectResp.NetworkSettings.Networks {
+			endpointsConfig[netName] = &network.EndpointSettings{
+				Aliases: ep.Aliases,
+			}
+		}
+		networkingConfig = &network.NetworkingConfig{EndpointsConfig: endpointsConfig}
+	}
+
+	resp, err := d.cli.ContainerCreate(ctx,
+		inspectResp.Config,
+		inspectResp.HostConfig,
+		networkingConfig,
+		nil,
+		name,
+	)
+	if err != nil {
+		return "", err
+	}
+	return resp.ID, nil
+}
+
+func (d *DockerClient) ServiceUpdate(ctx context.Context, serviceID string, imageName string) error {
+	svc, _, err := d.cli.ServiceInspectWithRaw(ctx, serviceID, swarm.ServiceInspectOptions{})
+	if err != nil {
+		return err
+	}
+	svc.Spec.TaskTemplate.ContainerSpec.Image = imageName
+	svc.Spec.TaskTemplate.ForceUpdate++
+	_, err = d.cli.ServiceUpdate(ctx, serviceID, svc.Version, svc.Spec, swarm.ServiceUpdateOptions{})
+	return err
 }
 
 func (d *DockerClient) ListContainers(ctx context.Context, labels container.ContainerLabels) ([]container.Container, error) {
@@ -429,20 +499,48 @@ func newContainerFromJSON(c docker.InspectResponse, host string) container.Conta
 		group = c.Config.Labels["coolify.projectName"]
 	}
 
+	// Format port bindings as readable strings
+	var ports []string
+	for port, bindings := range c.HostConfig.PortBindings {
+		for _, b := range bindings {
+			if b.HostPort != "" {
+				ports = append(ports, fmt.Sprintf("%s:%s->%s", b.HostIP, b.HostPort, port))
+			} else {
+				ports = append(ports, string(port))
+			}
+		}
+	}
+
+	// Format mounts as readable strings
+	var mounts []string
+	for _, m := range c.Mounts {
+		mounts = append(mounts, fmt.Sprintf("%s:%s (%s)", m.Source, m.Destination, m.Type))
+	}
+
+	restartPolicy := ""
+	if c.HostConfig.RestartPolicy.Name != "" {
+		restartPolicy = string(c.HostConfig.RestartPolicy.Name)
+	}
+
 	container := container.Container{
-		ID:          c.ID[:12],
-		Name:        name,
-		Image:       c.Config.Image,
-		Command:     strings.Join(c.Config.Entrypoint, " ") + " " + strings.Join(c.Config.Cmd, " "),
-		State:       c.State.Status,
-		Host:        host,
-		Labels:      c.Config.Labels,
-		Stats:       utils.NewRingBuffer[container.ContainerStat](300), // 300 seconds of stats
-		Group:       group,
-		Tty:         c.Config.Tty,
-		MemoryLimit: uint64(c.HostConfig.Memory),
-		CPULimit:    float64(c.HostConfig.NanoCPUs) / 1e9,
-		FullyLoaded: true,
+		ID:            c.ID[:12],
+		Name:          name,
+		Image:         c.Config.Image,
+		Command:       strings.Join(c.Config.Entrypoint, " ") + " " + strings.Join(c.Config.Cmd, " "),
+		State:         c.State.Status,
+		Host:          host,
+		Labels:        c.Config.Labels,
+		Stats:         utils.NewRingBuffer[container.ContainerStat](300), // 300 seconds of stats
+		Group:         group,
+		Tty:           c.Config.Tty,
+		MemoryLimit:   uint64(c.HostConfig.Memory),
+		CPULimit:      float64(c.HostConfig.NanoCPUs) / 1e9,
+		Env:           c.Config.Env,
+		Ports:         ports,
+		Mounts:        mounts,
+		RestartPolicy: restartPolicy,
+		NetworkMode:   string(c.HostConfig.NetworkMode),
+		FullyLoaded:   true,
 	}
 
 	if createdAt, err := time.Parse(time.RFC3339Nano, c.Created); err == nil {

@@ -8,6 +8,12 @@ toolbar:
   stop: Hentikan
   start: Mulai
   restart: Mulai ulang
+  update: Perbarui
+  update-service: Perbarui Layanan
+  update-pulling: Mengunduh image terbaru...
+  update-recreating: Membuat ulang kontainer...
+  update-done: Kontainer berhasil diperbarui
+  update-up-to-date: Sudah versi terbaru
   show-hostname: Tampilkan nama host
   show-container-name: Tampilkan nama kontainer
   shell: Shell
@@ -62,6 +68,13 @@ error:
   copy-not-supported-hint: Clipboard tidak tersedia. Salin tautan di bawah ini
   logs-skipped: Tampilkan {total} entri tersembunyi
   container-not-found: Kontainer tidak ditemukan
+  action-failed: Tindakan Gagal
+  update-failed: Pembaruan Gagal
+  unable-to-complete-action: Tidak dapat menyelesaikan tindakan
+  invalid-action: Tindakan tidak valid
+  unable-to-update: Tidak dapat memperbarui kontainer
+  something-went-wrong: Terjadi kesalahan
+  unknown-error: Kesalahan tidak diketahui
   events-stream:
     title: Kesalahan Tak Terduga
     message: >-
@@ -179,6 +192,7 @@ notifications:
   destinations: Tujuan
   add-destination: Tambah tujuan
   alerts: Peringatan
+  add-alert: Tambah peringatan
   add: Tambah
   filter:
     all: Semua ({count})
@@ -190,6 +204,7 @@ notifications:
     containers: Kontainer
     log-filter: Filter log
     metric-filter: Metrik
+    event-filter: Event
     cooldown: Jeda
     sample-window: Jendela sampel
     destination: Tujuan
@@ -228,9 +243,13 @@ notifications:
     sample-window-hint: "Peringatan dipicu ketika kondisi terpenuhi selama {duration}"
     cooldown-label: Jeda
     cooldown-hint: "{duration} antara peringatan per kontainer"
+    no-cooldown: No cooldown
     alert-type: Jenis Peringatan
     log-alert: Peringatan Log
     metric-alert: Peringatan Metrik
+    event-alert: Event Alert
+    event-filter: Event Expression
+    event-fields-hint: "Available fields: {fields}"
   destination-form:
     create-title: Tambah Tujuan
     edit-title: Edit Tujuan

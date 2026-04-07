@@ -73,6 +73,10 @@ func (s *stubClientService) ContainerAction(ctx context.Context, c container.Con
 	return nil
 }
 
+func (s *stubClientService) UpdateContainer(ctx context.Context, c container.Container, progressCh chan<- container.UpdateProgress) (bool, error) {
+	return false, nil
+}
+
 func (s *stubClientService) LogsBetweenDates(ctx context.Context, c container.Container, from time.Time, to time.Time, stdTypes container.StdType) (<-chan *container.LogEvent, error) {
 	return nil, nil
 }

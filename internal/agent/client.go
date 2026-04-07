@@ -261,10 +261,11 @@ func (c *Client) StreamEvents(ctx context.Context, events chan<- container.Conta
 		}
 
 		events <- container.ContainerEvent{
-			ActorID: resp.Event.ActorId,
-			Name:    resp.Event.Name,
-			Host:    resp.Event.Host,
-			Time:    resp.Event.Timestamp.AsTime(),
+			ActorID:         resp.Event.ActorId,
+			Name:            resp.Event.Name,
+			Host:            resp.Event.Host,
+			Time:            resp.Event.Timestamp.AsTime(),
+			ActorAttributes: resp.Event.ActorAttributes,
 		}
 	}
 }
@@ -377,7 +378,6 @@ func (c *Client) ContainerAction(ctx context.Context, containerId string, action
 
 	return err
 }
-
 func scanResultFromPb(result *pb.ScanResult) *trivy.Result {
 	if result == nil {
 		return nil
@@ -421,6 +421,38 @@ func scanResultFromPb(result *pb.ScanResult) *trivy.Result {
 	}
 
 	return out
+}
+
+func (c *Client) UpdateContainer(ctx context.Context, containerID string, progressCh chan<- container.UpdateProgress) (bool, error) {
+	defer close(progressCh)
+
+	stream, err := c.client.UpdateContainer(ctx, &pb.UpdateContainerRequest{ContainerId: containerID})
+	if err != nil {
+		return false, err
+	}
+
+	updated := false
+	for {
+		progress, err := stream.Recv()
+		if err == io.EOF {
+			return updated, nil
+		}
+		if err != nil {
+			return false, err
+		}
+
+		if progress.Status == "done" {
+			updated = true
+		}
+
+		progressCh <- container.UpdateProgress{
+			Status:  progress.Status,
+			Layer:   progress.Layer,
+			Current: progress.Current,
+			Total:   progress.Total,
+			Error:   progress.Error,
+		}
+	}
 }
 
 func (c *Client) ContainerAttach(ctx context.Context, containerId string) (*container.ExecSession, error) {
@@ -575,6 +607,7 @@ func (c *Client) UpdateNotificationConfig(ctx context.Context, subscriptions []t
 			MetricExpression:    sub.MetricExpression,
 			Cooldown:            int32(sub.Cooldown),
 			SampleWindow:        int32(sub.SampleWindow),
+			EventExpression:     sub.EventExpression,
 			StateTriggers:       append([]string(nil), sub.StateTriggers...),
 			HoldoffSeconds:      int32(sub.HoldoffSeconds),
 			Template:            sub.Template,
@@ -590,10 +623,15 @@ func (c *Client) UpdateNotificationConfig(ctx context.Context, subscriptions []t
 			Url:             d.URL,
 			Template:        d.Template,
 			Headers:         d.Headers,
+			ApiKey:          d.APIKey,
+			Prefix:          d.Prefix,
 			BotToken:        d.BotToken,
 			ChatId:          d.ChatID,
 			MessageThreadId: d.MessageThreadID,
 			ParseMode:       d.ParseMode,
+		}
+		if d.ExpiresAt != nil {
+			pbDispatchers[i].ExpiresAt = timestamppb.New(*d.ExpiresAt)
 		}
 	}
 

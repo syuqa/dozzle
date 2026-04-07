@@ -252,6 +252,7 @@ func (m *MultiHostService) broadcastNotificationConfig() {
 			LogExpression:       sub.LogExpression,
 			ContainerExpression: sub.ContainerExpression,
 			MetricExpression:    sub.MetricExpression,
+			EventExpression:     sub.EventExpression,
 			Cooldown:            sub.Cooldown,
 			SampleWindow:        sub.SampleWindow,
 			StateTriggers:       append([]string(nil), sub.StateTriggers...),
@@ -296,6 +297,12 @@ func (m *MultiHostService) broadcastNotificationConfig() {
 		}
 	}
 	wg.Wait()
+}
+
+// NotificationHandler returns the notification manager as an agent.NotificationConfigHandler.
+// This is used in swarm mode to pass the handler to the local agent server.
+func (m *MultiHostService) NotificationHandler() *notification.Manager {
+	return m.notificationManager
 }
 
 // AddSubscription adds a subscription to local manager and broadcasts to agents

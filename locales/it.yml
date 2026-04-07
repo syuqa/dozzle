@@ -8,6 +8,12 @@ toolbar:
   stop: Stop
   start: Start
   restart: Restart
+  update: Aggiorna
+  update-service: Aggiorna Servizio
+  update-pulling: Download dell'ultima immagine...
+  update-recreating: Ricreazione del container...
+  update-done: Container aggiornato con successo
+  update-up-to-date: Già aggiornato
   show-hostname: Mostra nome host
   show-container-name: Mostra nome container
   shell: Shell
@@ -59,6 +65,13 @@ error:
   copy-not-supported-hint: Appunti non disponibili. Copia il link qui sotto
   logs-skipped: Mostra {total} voci nascoste
   container-not-found: Container non trovato
+  action-failed: Azione Fallita
+  update-failed: Aggiornamento Fallito
+  unable-to-complete-action: Impossibile completare l'azione
+  invalid-action: Azione non valida
+  unable-to-update: Impossibile aggiornare il container
+  something-went-wrong: Qualcosa è andato storto
+  unknown-error: Errore sconosciuto
   events-stream:
     title: Errore inaspettato
     message: >-
@@ -167,6 +180,7 @@ notifications:
   destinations: Destinazioni
   add-destination: Aggiungi destinazione
   alerts: Avvisi
+  add-alert: Aggiungi avviso
   add: Aggiungi
   filter:
     all: Tutti ({count})
@@ -178,6 +192,7 @@ notifications:
     containers: Container
     log-filter: Filtro log
     metric-filter: Metrica
+    event-filter: Event
     cooldown: Tempo di attesa
     sample-window: Finestra di campionamento
     destination: Destinazione
@@ -216,9 +231,13 @@ notifications:
     sample-window-hint: "L'avviso si attiva quando la condizione è soddisfatta per {duration}"
     cooldown-label: Tempo di attesa
     cooldown-hint: "{duration} tra gli avvisi per container"
+    no-cooldown: No cooldown
     alert-type: Tipo di avviso
     log-alert: Avviso log
     metric-alert: Avviso metrica
+    event-alert: Event Alert
+    event-filter: Event Expression
+    event-fields-hint: "Available fields: {fields}"
   destination-form:
     create-title: Aggiungi Destinazione
     edit-title: Modifica Destinazione

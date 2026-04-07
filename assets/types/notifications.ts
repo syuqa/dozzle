@@ -6,6 +6,7 @@ export interface NotificationRule {
   containerExpression: string;
   logExpression: string;
   metricExpression?: string;
+  eventExpression?: string;
   cooldown?: number;
   sampleWindow?: number;
   stateTriggers?: string[];
@@ -75,6 +76,7 @@ export interface NotificationRuleInput {
   logExpression: string;
   containerExpression: string;
   metricExpression?: string;
+  eventExpression?: string;
   cooldown?: number;
   sampleWindow?: number;
   template?: string;
@@ -85,6 +87,7 @@ export interface PreviewResult {
   containerError?: string;
   logError?: string;
   metricError?: string;
+  eventError?: string;
   matchedContainers: {
     id: string;
     name: string;

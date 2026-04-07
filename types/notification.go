@@ -10,6 +10,7 @@ const (
 	MetricNotification NotificationType = "metric"
 	ScanNotification   NotificationType = "scan"
 	StateNotification  NotificationType = "state"
+	EventNotification  NotificationType = "event"
 )
 
 // Notification represents a notification event that can be filtered and sent
@@ -22,6 +23,7 @@ type Notification struct {
 	Stat         *NotificationStat     `json:"stat,omitempty"`
 	Scan         *NotificationScan     `json:"scan,omitempty"`
 	State        *NotificationState    `json:"state,omitempty"`
+	Event        *NotificationEvent    `json:"event,omitempty"`
 	Subscription SubscriptionConfig    `json:"subscription"`
 	Timestamp    time.Time             `json:"timestamp"`
 }
@@ -97,6 +99,14 @@ type NotificationState struct {
 	Attributes    map[string]string `json:"attributes,omitempty"`
 }
 
+// NotificationEvent represents a Docker container lifecycle event for event-based alerts
+type NotificationEvent struct {
+	Name       string            `json:"name" expr:"name"`
+	ActorID    string            `json:"actorId" expr:"actorId"`
+	Attributes map[string]string `json:"attributes" expr:"attributes"`
+	Timestamp  time.Time         `json:"timestamp" expr:"timestamp"`
+}
+
 // SubscriptionConfig represents a notification subscription configuration
 type SubscriptionConfig struct {
 	ID                  int      `json:"id"`
@@ -106,6 +116,7 @@ type SubscriptionConfig struct {
 	LogExpression       string   `json:"logExpression,omitempty"`
 	ContainerExpression string   `json:"containerExpression"`
 	MetricExpression    string   `json:"metricExpression,omitempty"`
+	EventExpression     string   `json:"eventExpression,omitempty"`
 	Cooldown            int      `json:"cooldown,omitempty"`
 	SampleWindow        int      `json:"sampleWindow,omitempty"`
 	StateTriggers       []string `json:"stateTriggers,omitempty"`

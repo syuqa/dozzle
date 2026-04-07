@@ -51,6 +51,7 @@ func (m *Manager) LoadConfig(r io.Reader) error {
 			LogExpression:       sub.LogExpression,
 			ContainerExpression: sub.ContainerExpression,
 			MetricExpression:    sub.MetricExpression,
+			EventExpression:     sub.EventExpression,
 			Cooldown:            sub.Cooldown,
 			SampleWindow:        sub.SampleWindow,
 			StateTriggers:       append([]string(nil), sub.StateTriggers...),
@@ -144,6 +145,7 @@ func (m *Manager) HandleNotificationConfig(subscriptions []types.SubscriptionCon
 			LogExpression:       sub.LogExpression,
 			ContainerExpression: sub.ContainerExpression,
 			MetricExpression:    sub.MetricExpression,
+			EventExpression:     sub.EventExpression,
 			Cooldown:            sub.Cooldown,
 			SampleWindow:        sub.SampleWindow,
 			StateTriggers:       append([]string(nil), sub.StateTriggers...),
@@ -178,6 +180,14 @@ func (m *Manager) HandleNotificationConfig(subscriptions []types.SubscriptionCon
 			if old.StateCooldowns != nil {
 				old.StateCooldowns.Range(func(id string, t time.Time) bool {
 					s.StateCooldowns.Store(id, t)
+					return true
+				})
+			}
+
+			s.EventCooldowns = xsync.NewMap[string, time.Time]()
+			if old.EventCooldowns != nil {
+				old.EventCooldowns.Range(func(id string, t time.Time) bool {
+					s.EventCooldowns.Store(id, t)
 					return true
 				})
 			}
@@ -258,6 +268,9 @@ func (m *Manager) loadSubscription(sub *Subscription) error {
 	}
 	if sub.StateCooldowns == nil {
 		sub.StateCooldowns = xsync.NewMap[string, time.Time]()
+	}
+	if sub.EventCooldowns == nil {
+		sub.EventCooldowns = xsync.NewMap[string, time.Time]()
 	}
 	if err := sub.Validate(); err != nil {
 		return err

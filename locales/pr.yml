@@ -8,6 +8,12 @@ toolbar:
   stop: Parar
   start: Iniciar
   restart: Reiniciar
+  update: Swab the Decks
+  update-service: Update th' Service
+  update-pulling: Haulin' the latest image...
+  update-recreating: Rebuildin' the vessel...
+  update-done: Container updated, arr!
+  update-up-to-date: Already shipshape, cap'n!
   show-hostname: Mostrar nome do anfitrião
   show-container-name: Mostrar nome do contentor
   shell: Shell
@@ -62,6 +68,13 @@ error:
   copy-not-supported-hint: Área de transferência indisponível. Copie o link abaixo
   logs-skipped: Mostrar {total} entradas ocultas
   container-not-found: Contentor não encontrado.
+  action-failed: Action Be Cursed!
+  update-failed: Update Be Scuttled!
+  unable-to-complete-action: Can't finish the deed, matey
+  invalid-action: That be no proper action
+  unable-to-update: Can't swab this container
+  something-went-wrong: Blimey, somethin' went wrong!
+  unknown-error: Unknown curse upon us
   events-stream:
     title: Erro inesperado
     message: >-
@@ -176,6 +189,7 @@ notifications:
   destinations: Destinos
   add-destination: Adicionar destino
   alerts: Alertas
+  add-alert: Adicionar alerta
   add: Adicionar
   filter:
     all: Todos ({count})
@@ -187,6 +201,7 @@ notifications:
     containers: Contentores
     log-filter: Filtro de registo
     metric-filter: Métrica
+    event-filter: Event
     cooldown: Tempo de espera
     sample-window: Janela de amostragem
     destination: Destino
@@ -225,9 +240,13 @@ notifications:
     sample-window-hint: "O alerta é ativado quando a condição é cumprida durante {duration}"
     cooldown-label: Tempo de espera
     cooldown-hint: "{duration} entre alertas por contentor"
+    no-cooldown: No cooldown
     alert-type: Tipo de alerta
     log-alert: Alerta de log
     metric-alert: Alerta de métrica
+    event-alert: Event Alert
+    event-filter: Event Expression
+    event-fields-hint: "Available fields: {fields}"
   destination-form:
     create-title: Adicionar Destino
     edit-title: Editar Destino

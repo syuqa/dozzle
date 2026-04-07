@@ -8,6 +8,12 @@ toolbar:
   stop: Stop
   start: Start
   restart: Genstart
+  update: Opdater
+  update-service: Opdater Tjeneste
+  update-pulling: Henter seneste image...
+  update-recreating: Genskaber container...
+  update-done: Container opdateret succesfuldt
+  update-up-to-date: Allerede opdateret
   show-hostname: Vis værtsnavn
   show-container-name: Vis containernavn
   shell: Shell
@@ -59,6 +65,13 @@ error:
   copy-not-supported-hint: Udklipsholder ikke tilgængelig. Kopiér linket nedenfor
   logs-skipped: Vis {total} skjulte indtastninger
   container-not-found: Container ikke fundet
+  action-failed: Handling Mislykkedes
+  update-failed: Opdatering Mislykkedes
+  unable-to-complete-action: Kan ikke fuldføre handling
+  invalid-action: Ugyldig handling
+  unable-to-update: Kan ikke opdatere container
+  something-went-wrong: Noget gik galt
+  unknown-error: Ukendt fejl
   events-stream:
     title: Uventet fejl
     message: >-
@@ -167,6 +180,7 @@ notifications:
   destinations: Destinationer
   add-destination: Tilføj destination
   alerts: Alarmer
+  add-alert: Tilføj alarm
   add: Tilføj
   filter:
     all: Alle ({count})
@@ -178,6 +192,7 @@ notifications:
     containers: Containere
     log-filter: Log filter
     metric-filter: Metrik
+    event-filter: Event
     cooldown: Afkøling
     sample-window: Prøvevindue
     destination: Destination
@@ -216,9 +231,13 @@ notifications:
     sample-window-hint: "Alarm udløses, når betingelsen er opfyldt i {duration}"
     cooldown-label: Afkøling
     cooldown-hint: "{duration} mellem alarmer pr. container"
+    no-cooldown: No cooldown
     alert-type: Alarmtype
     log-alert: Logalarm
     metric-alert: Metrikalarm
+    event-alert: Event Alert
+    event-filter: Event Expression
+    event-fields-hint: "Available fields: {fields}"
   destination-form:
     create-title: Tilføj Destination
     edit-title: Rediger Destination

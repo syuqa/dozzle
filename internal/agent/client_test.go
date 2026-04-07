@@ -14,6 +14,7 @@ import (
 	"github.com/amir20/dozzle/internal/container"
 	"github.com/amir20/dozzle/internal/trivy"
 	"github.com/amir20/dozzle/internal/utils"
+	"github.com/amir20/dozzle/types"
 	"github.com/go-faker/faker/v4"
 	"github.com/go-faker/faker/v4/pkg/options"
 	"github.com/stretchr/testify/assert"
@@ -29,6 +30,16 @@ var lis *bufconn.Listener
 var certs tls.Certificate
 var mockService *MockedClientService
 var mockScanner *MockedScanRunner
+
+type mockNotificationHandler struct{}
+
+func (m *mockNotificationHandler) HandleNotificationConfig(subscriptions []types.SubscriptionConfig, dispatchers []types.DispatcherConfig) error {
+	return nil
+}
+
+func (m *mockNotificationHandler) GetNotificationStats() []types.SubscriptionStats {
+	return nil
+}
 
 type MockedClientService struct {
 	mock.Mock
@@ -103,6 +114,11 @@ func (m *MockedScanRunner) ScanImage(ctx context.Context, image string) (*trivy.
 	return nil, args.Error(1)
 }
 
+func (m *MockedClientService) UpdateContainer(ctx context.Context, c container.Container, progressCh chan<- container.UpdateProgress) (bool, error) {
+	args := m.Called(ctx, c, progressCh)
+	return args.Bool(0), args.Error(1)
+}
+
 var wantedContainer = container.Container{}
 
 func init() {
@@ -156,7 +172,7 @@ func init() {
 
 	mockService.On("Client").Return(nil)
 
-	server, _ := NewServer(mockService, certs, "test", nil, mockScanner)
+	server, _ := NewServer(mockService, certs, "test", &mockNotificationHandler{}, mockScanner)
 	go server.Serve(lis)
 }
 

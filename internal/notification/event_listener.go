@@ -2,12 +2,22 @@ package notification
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/amir20/dozzle/internal/container"
 	container_support "github.com/amir20/dozzle/internal/support/container"
 	"github.com/rs/zerolog/log"
 )
+
+var allowedEventNames = map[string]bool{
+	"start":         true,
+	"stop":          true,
+	"die":           true,
+	"restart":       true,
+	"health_status": true,
+	"oom":           true,
+}
 
 // ContainerEventEnvelope pairs an event with resolved container and host metadata.
 type ContainerEventEnvelope struct {
@@ -16,12 +26,13 @@ type ContainerEventEnvelope struct {
 	Host      container.Host
 }
 
-// ContainerEventListener subscribes to container events and enriches them with metadata.
 type ContainerEventListener struct {
-	clients   []container_support.ClientService
-	channel   chan *ContainerEventEnvelope
-	parentCtx context.Context
-	cache     *TTLCache[string, containerInfo]
+	clients    []container_support.ClientService
+	channel    chan *ContainerEventEnvelope
+	parentCtx  context.Context
+	cache      *TTLCache[string, containerInfo]
+	mu         sync.Mutex
+	cancelFunc context.CancelFunc
 }
 
 func NewContainerEventListener(ctx context.Context, clients []container_support.ClientService) *ContainerEventListener {
@@ -34,12 +45,31 @@ func NewContainerEventListener(ctx context.Context, clients []container_support.
 }
 
 func (l *ContainerEventListener) Start() {
-	rawEvents := make(chan container.ContainerEvent, 1000)
-	for _, client := range l.clients {
-		client.SubscribeEvents(l.parentCtx, rawEvents)
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.cancelFunc != nil {
+		return
 	}
 
-	go l.enrich(l.parentCtx, rawEvents)
+	ctx, cancel := context.WithCancel(l.parentCtx)
+	l.cancelFunc = cancel
+
+	rawEvents := make(chan container.ContainerEvent, 1000)
+	for _, client := range l.clients {
+		client.SubscribeEvents(ctx, rawEvents)
+	}
+
+	go l.enrich(ctx, rawEvents)
+}
+
+func (l *ContainerEventListener) Stop() {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.cancelFunc == nil {
+		return
+	}
+	l.cancelFunc()
+	l.cancelFunc = nil
 }
 
 func (l *ContainerEventListener) enrich(ctx context.Context, rawEvents <-chan container.ContainerEvent) {
@@ -51,9 +81,15 @@ func (l *ContainerEventListener) enrich(ctx context.Context, rawEvents <-chan co
 			if !ok {
 				return
 			}
+			if !allowedEventNames[event.Name] {
+				continue
+			}
 			c, host, err := l.resolveEvent(ctx, event)
 			if err != nil {
 				log.Debug().Err(err).Str("containerID", event.ActorID).Str("event", event.Name).Msg("Failed to resolve container event")
+				continue
+			}
+			if isDozzleContainer(c) {
 				continue
 			}
 
@@ -105,7 +141,6 @@ func (l *ContainerEventListener) resolveEvent(ctx context.Context, event contain
 	}
 
 	if cached, ok := l.cache.Load(cacheKey); ok {
-		// Keep cached metadata available for stop/destroy style events that can race with removal.
 		return cached.container, cached.host, nil
 	}
 

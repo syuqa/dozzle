@@ -93,6 +93,11 @@ type Container struct {
 	MemoryLimit   uint64                 `protobuf:"varint,17,opt,name=memoryLimit,proto3" json:"memoryLimit,omitempty"`
 	CpuLimit      float64                `protobuf:"fixed64,18,opt,name=cpuLimit,proto3" json:"cpuLimit,omitempty"`
 	FullyLoaded   bool                   `protobuf:"varint,19,opt,name=fullyLoaded,proto3" json:"fullyLoaded,omitempty"`
+	Env           []string               `protobuf:"bytes,20,rep,name=env,proto3" json:"env,omitempty"`
+	Ports         []string               `protobuf:"bytes,21,rep,name=ports,proto3" json:"ports,omitempty"`
+	Mounts        []string               `protobuf:"bytes,22,rep,name=mounts,proto3" json:"mounts,omitempty"`
+	RestartPolicy string                 `protobuf:"bytes,23,opt,name=restartPolicy,proto3" json:"restartPolicy,omitempty"`
+	NetworkMode   string                 `protobuf:"bytes,24,opt,name=networkMode,proto3" json:"networkMode,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -258,6 +263,41 @@ func (x *Container) GetFullyLoaded() bool {
 		return x.FullyLoaded
 	}
 	return false
+}
+
+func (x *Container) GetEnv() []string {
+	if x != nil {
+		return x.Env
+	}
+	return nil
+}
+
+func (x *Container) GetPorts() []string {
+	if x != nil {
+		return x.Ports
+	}
+	return nil
+}
+
+func (x *Container) GetMounts() []string {
+	if x != nil {
+		return x.Mounts
+	}
+	return nil
+}
+
+func (x *Container) GetRestartPolicy() string {
+	if x != nil {
+		return x.RestartPolicy
+	}
+	return ""
+}
+
+func (x *Container) GetNetworkMode() string {
+	if x != nil {
+		return x.NetworkMode
+	}
+	return ""
 }
 
 type ContainerStat struct {
@@ -621,13 +661,14 @@ func (x *ComplexMessage) GetData() []byte {
 }
 
 type ContainerEvent struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ActorId       string                 `protobuf:"bytes,1,opt,name=actorId,proto3" json:"actorId,omitempty"`
-	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Host          string                 `protobuf:"bytes,3,opt,name=host,proto3" json:"host,omitempty"`
-	Timestamp     *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	ActorId         string                 `protobuf:"bytes,1,opt,name=actorId,proto3" json:"actorId,omitempty"`
+	Name            string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Host            string                 `protobuf:"bytes,3,opt,name=host,proto3" json:"host,omitempty"`
+	Timestamp       *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	ActorAttributes map[string]string      `protobuf:"bytes,5,rep,name=actorAttributes,proto3" json:"actorAttributes,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *ContainerEvent) Reset() {
@@ -684,6 +725,13 @@ func (x *ContainerEvent) GetHost() string {
 func (x *ContainerEvent) GetTimestamp() *timestamppb.Timestamp {
 	if x != nil {
 		return x.Timestamp
+	}
+	return nil
+}
+
+func (x *ContainerEvent) GetActorAttributes() map[string]string {
+	if x != nil {
+		return x.ActorAttributes
 	}
 	return nil
 }
@@ -831,9 +879,10 @@ type NotificationSubscription struct {
 	MetricExpression    string                 `protobuf:"bytes,7,opt,name=metricExpression,proto3" json:"metricExpression,omitempty"`
 	Cooldown            int32                  `protobuf:"varint,8,opt,name=cooldown,proto3" json:"cooldown,omitempty"`
 	SampleWindow        int32                  `protobuf:"varint,9,opt,name=sampleWindow,proto3" json:"sampleWindow,omitempty"`
-	StateTriggers       []string               `protobuf:"bytes,10,rep,name=stateTriggers,proto3" json:"stateTriggers,omitempty"`
-	HoldoffSeconds      int32                  `protobuf:"varint,11,opt,name=holdoffSeconds,proto3" json:"holdoffSeconds,omitempty"`
-	Template            string                 `protobuf:"bytes,12,opt,name=template,proto3" json:"template,omitempty"`
+	EventExpression     string                 `protobuf:"bytes,10,opt,name=eventExpression,proto3" json:"eventExpression,omitempty"`
+	StateTriggers       []string               `protobuf:"bytes,11,rep,name=stateTriggers,proto3" json:"stateTriggers,omitempty"`
+	HoldoffSeconds      int32                  `protobuf:"varint,12,opt,name=holdoffSeconds,proto3" json:"holdoffSeconds,omitempty"`
+	Template            string                 `protobuf:"bytes,13,opt,name=template,proto3" json:"template,omitempty"`
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
@@ -931,6 +980,13 @@ func (x *NotificationSubscription) GetSampleWindow() int32 {
 	return 0
 }
 
+func (x *NotificationSubscription) GetEventExpression() string {
+	if x != nil {
+		return x.EventExpression
+	}
+	return ""
+}
+
 func (x *NotificationSubscription) GetStateTriggers() []string {
 	if x != nil {
 		return x.StateTriggers
@@ -960,10 +1016,13 @@ type NotificationDispatcher struct {
 	Url             string                 `protobuf:"bytes,4,opt,name=url,proto3" json:"url,omitempty"`
 	Template        string                 `protobuf:"bytes,5,opt,name=template,proto3" json:"template,omitempty"`
 	Headers         map[string]string      `protobuf:"bytes,6,rep,name=headers,proto3" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	BotToken        string                 `protobuf:"bytes,7,opt,name=botToken,proto3" json:"botToken,omitempty"`
-	ChatId          string                 `protobuf:"bytes,8,opt,name=chatId,proto3" json:"chatId,omitempty"`
-	MessageThreadId string                 `protobuf:"bytes,9,opt,name=messageThreadId,proto3" json:"messageThreadId,omitempty"`
-	ParseMode       string                 `protobuf:"bytes,10,opt,name=parseMode,proto3" json:"parseMode,omitempty"`
+	ApiKey          string                 `protobuf:"bytes,7,opt,name=apiKey,proto3" json:"apiKey,omitempty"`
+	Prefix          string                 `protobuf:"bytes,8,opt,name=prefix,proto3" json:"prefix,omitempty"`
+	ExpiresAt       *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=expiresAt,proto3" json:"expiresAt,omitempty"`
+	BotToken        string                 `protobuf:"bytes,10,opt,name=botToken,proto3" json:"botToken,omitempty"`
+	ChatId          string                 `protobuf:"bytes,11,opt,name=chatId,proto3" json:"chatId,omitempty"`
+	MessageThreadId string                 `protobuf:"bytes,12,opt,name=messageThreadId,proto3" json:"messageThreadId,omitempty"`
+	ParseMode       string                 `protobuf:"bytes,13,opt,name=parseMode,proto3" json:"parseMode,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -1036,6 +1095,27 @@ func (x *NotificationDispatcher) GetTemplate() string {
 func (x *NotificationDispatcher) GetHeaders() map[string]string {
 	if x != nil {
 		return x.Headers
+	}
+	return nil
+}
+
+func (x *NotificationDispatcher) GetApiKey() string {
+	if x != nil {
+		return x.ApiKey
+	}
+	return ""
+}
+
+func (x *NotificationDispatcher) GetPrefix() string {
+	if x != nil {
+		return x.Prefix
+	}
+	return ""
+}
+
+func (x *NotificationDispatcher) GetExpiresAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ExpiresAt
 	}
 	return nil
 }
@@ -1140,7 +1220,7 @@ var File_types_proto protoreflect.FileDescriptor
 
 const file_types_proto_rawDesc = "" +
 	"\n" +
-	"\vtypes.proto\x12\bprotobuf\x1a\x19google/protobuf/any.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xa2\x05\n" +
+	"\vtypes.proto\x12\bprotobuf\x1a\x19google/protobuf/any.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xaa\x06\n" +
 	"\tContainer\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
@@ -1161,7 +1241,12 @@ const file_types_proto_rawDesc = "" +
 	"\bfinished\x18\x10 \x01(\v2\x1a.google.protobuf.TimestampR\bfinished\x12 \n" +
 	"\vmemoryLimit\x18\x11 \x01(\x04R\vmemoryLimit\x12\x1a\n" +
 	"\bcpuLimit\x18\x12 \x01(\x01R\bcpuLimit\x12 \n" +
-	"\vfullyLoaded\x18\x13 \x01(\bR\vfullyLoaded\x1a9\n" +
+	"\vfullyLoaded\x18\x13 \x01(\bR\vfullyLoaded\x12\x10\n" +
+	"\x03env\x18\x14 \x03(\tR\x03env\x12\x14\n" +
+	"\x05ports\x18\x15 \x03(\tR\x05ports\x12\x16\n" +
+	"\x06mounts\x18\x16 \x03(\tR\x06mounts\x12$\n" +
+	"\rrestartPolicy\x18\x17 \x01(\tR\rrestartPolicy\x12 \n" +
+	"\vnetworkMode\x18\x18 \x01(\tR\vnetworkMode\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xd7\x01\n" +
@@ -1192,12 +1277,16 @@ const file_types_proto_rawDesc = "" +
 	"\fGroupMessage\x123\n" +
 	"\tfragments\x18\x01 \x03(\v2\x15.protobuf.LogFragmentR\tfragments\"$\n" +
 	"\x0eComplexMessage\x12\x12\n" +
-	"\x04data\x18\x01 \x01(\fR\x04data\"\x8c\x01\n" +
+	"\x04data\x18\x01 \x01(\fR\x04data\"\xa9\x02\n" +
 	"\x0eContainerEvent\x12\x18\n" +
 	"\aactorId\x18\x01 \x01(\tR\aactorId\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x12\n" +
 	"\x04host\x18\x03 \x01(\tR\x04host\x128\n" +
-	"\ttimestamp\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\"\xaf\x03\n" +
+	"\ttimestamp\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\x12W\n" +
+	"\x0factorAttributes\x18\x05 \x03(\v2-.protobuf.ContainerEvent.ActorAttributesEntryR\x0factorAttributes\x1aB\n" +
+	"\x14ActorAttributesEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xaf\x03\n" +
 	"\x04Host\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
@@ -1214,7 +1303,7 @@ const file_types_proto_rawDesc = "" +
 	"\rdockerVersion\x18\f \x01(\tR\rdockerVersion\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xaa\x03\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xd4\x03\n" +
 	"\x18NotificationSubscription\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x05R\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x18\n" +
@@ -1224,23 +1313,27 @@ const file_types_proto_rawDesc = "" +
 	"\x13containerExpression\x18\x06 \x01(\tR\x13containerExpression\x12*\n" +
 	"\x10metricExpression\x18\a \x01(\tR\x10metricExpression\x12\x1a\n" +
 	"\bcooldown\x18\b \x01(\x05R\bcooldown\x12\"\n" +
-	"\fsampleWindow\x18\t \x01(\x05R\fsampleWindow\x12$\n" +
-	"\rstateTriggers\x18\n" +
-	" \x03(\tR\rstateTriggers\x12&\n" +
-	"\x0eholdoffSeconds\x18\v \x01(\x05R\x0eholdoffSeconds\x12\x1a\n" +
-	"\btemplate\x18\f \x01(\tR\btemplate\"\xff\x02\n" +
+	"\fsampleWindow\x18\t \x01(\x05R\fsampleWindow\x12(\n" +
+	"\x0feventExpression\x18\n" +
+	" \x01(\tR\x0feventExpression\x12$\n" +
+	"\rstateTriggers\x18\v \x03(\tR\rstateTriggers\x12&\n" +
+	"\x0eholdoffSeconds\x18\f \x01(\x05R\x0eholdoffSeconds\x12\x1a\n" +
+	"\btemplate\x18\r \x01(\tR\btemplate\"\xe9\x03\n" +
 	"\x16NotificationDispatcher\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x05R\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x12\n" +
 	"\x04type\x18\x03 \x01(\tR\x04type\x12\x10\n" +
 	"\x03url\x18\x04 \x01(\tR\x03url\x12\x1a\n" +
 	"\btemplate\x18\x05 \x01(\tR\btemplate\x12G\n" +
-	"\aheaders\x18\x06 \x03(\v2-.protobuf.NotificationDispatcher.HeadersEntryR\aheaders\x12\x1a\n" +
-	"\bbotToken\x18\a \x01(\tR\bbotToken\x12\x16\n" +
-	"\x06chatId\x18\b \x01(\tR\x06chatId\x12(\n" +
-	"\x0fmessageThreadId\x18\t \x01(\tR\x0fmessageThreadId\x12\x1c\n" +
-	"\tparseMode\x18\n" +
-	" \x01(\tR\tparseMode\x1a:\n" +
+	"\aheaders\x18\x06 \x03(\v2-.protobuf.NotificationDispatcher.HeadersEntryR\aheaders\x12\x16\n" +
+	"\x06apiKey\x18\a \x01(\tR\x06apiKey\x12\x16\n" +
+	"\x06prefix\x18\b \x01(\tR\x06prefix\x128\n" +
+	"\texpiresAt\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\x12\x1a\n" +
+	"\bbotToken\x18\n" +
+	" \x01(\tR\bbotToken\x12\x16\n" +
+	"\x06chatId\x18\v \x01(\tR\x06chatId\x12(\n" +
+	"\x0fmessageThreadId\x18\f \x01(\tR\x0fmessageThreadId\x12\x1c\n" +
+	"\tparseMode\x18\r \x01(\tR\tparseMode\x1a:\n" +
 	"\fHeadersEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xe7\x01\n" +
@@ -1267,7 +1360,7 @@ func file_types_proto_rawDescGZIP() []byte {
 }
 
 var file_types_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_types_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
+var file_types_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
 var file_types_proto_goTypes = []any{
 	(ContainerAction)(0),                  // 0: protobuf.ContainerAction
 	(*Container)(nil),                     // 1: protobuf.Container
@@ -1283,29 +1376,32 @@ var file_types_proto_goTypes = []any{
 	(*NotificationDispatcher)(nil),        // 11: protobuf.NotificationDispatcher
 	(*NotificationSubscriptionStats)(nil), // 12: protobuf.NotificationSubscriptionStats
 	nil,                                   // 13: protobuf.Container.LabelsEntry
-	nil,                                   // 14: protobuf.Host.LabelsEntry
-	nil,                                   // 15: protobuf.NotificationDispatcher.HeadersEntry
-	(*timestamppb.Timestamp)(nil),         // 16: google.protobuf.Timestamp
-	(*anypb.Any)(nil),                     // 17: google.protobuf.Any
+	nil,                                   // 14: protobuf.ContainerEvent.ActorAttributesEntry
+	nil,                                   // 15: protobuf.Host.LabelsEntry
+	nil,                                   // 16: protobuf.NotificationDispatcher.HeadersEntry
+	(*timestamppb.Timestamp)(nil),         // 17: google.protobuf.Timestamp
+	(*anypb.Any)(nil),                     // 18: google.protobuf.Any
 }
 var file_types_proto_depIdxs = []int32{
-	16, // 0: protobuf.Container.created:type_name -> google.protobuf.Timestamp
-	16, // 1: protobuf.Container.started:type_name -> google.protobuf.Timestamp
+	17, // 0: protobuf.Container.created:type_name -> google.protobuf.Timestamp
+	17, // 1: protobuf.Container.started:type_name -> google.protobuf.Timestamp
 	13, // 2: protobuf.Container.labels:type_name -> protobuf.Container.LabelsEntry
 	2,  // 3: protobuf.Container.stats:type_name -> protobuf.ContainerStat
-	16, // 4: protobuf.Container.finished:type_name -> google.protobuf.Timestamp
-	17, // 5: protobuf.LogEvent.message:type_name -> google.protobuf.Any
-	16, // 6: protobuf.LogEvent.timestamp:type_name -> google.protobuf.Timestamp
+	17, // 4: protobuf.Container.finished:type_name -> google.protobuf.Timestamp
+	18, // 5: protobuf.LogEvent.message:type_name -> google.protobuf.Any
+	17, // 6: protobuf.LogEvent.timestamp:type_name -> google.protobuf.Timestamp
 	3,  // 7: protobuf.GroupMessage.fragments:type_name -> protobuf.LogFragment
-	16, // 8: protobuf.ContainerEvent.timestamp:type_name -> google.protobuf.Timestamp
-	14, // 9: protobuf.Host.labels:type_name -> protobuf.Host.LabelsEntry
-	15, // 10: protobuf.NotificationDispatcher.headers:type_name -> protobuf.NotificationDispatcher.HeadersEntry
-	16, // 11: protobuf.NotificationSubscriptionStats.lastTriggeredAt:type_name -> google.protobuf.Timestamp
-	12, // [12:12] is the sub-list for method output_type
-	12, // [12:12] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	17, // 8: protobuf.ContainerEvent.timestamp:type_name -> google.protobuf.Timestamp
+	14, // 9: protobuf.ContainerEvent.actorAttributes:type_name -> protobuf.ContainerEvent.ActorAttributesEntry
+	15, // 10: protobuf.Host.labels:type_name -> protobuf.Host.LabelsEntry
+	16, // 11: protobuf.NotificationDispatcher.headers:type_name -> protobuf.NotificationDispatcher.HeadersEntry
+	17, // 12: protobuf.NotificationDispatcher.expiresAt:type_name -> google.protobuf.Timestamp
+	17, // 13: protobuf.NotificationSubscriptionStats.lastTriggeredAt:type_name -> google.protobuf.Timestamp
+	14, // [14:14] is the sub-list for method output_type
+	14, // [14:14] is the sub-list for method input_type
+	14, // [14:14] is the sub-list for extension type_name
+	14, // [14:14] is the sub-list for extension extendee
+	0,  // [0:14] is the sub-list for field type_name
 }
 
 func init() { file_types_proto_init() }
@@ -1319,7 +1415,7 @@ func file_types_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_types_proto_rawDesc), len(file_types_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   15,
+			NumMessages:   16,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

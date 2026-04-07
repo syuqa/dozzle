@@ -10,6 +10,7 @@ import (
 
 	"github.com/amir20/dozzle/internal/container"
 	docker_support "github.com/amir20/dozzle/internal/support/docker"
+	docker_types "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/system"
 	"github.com/go-chi/chi/v5"
 
@@ -57,6 +58,31 @@ func (m *MockedClient) ContainerLogsBetweenDates(ctx context.Context, id string,
 	return args.Get(0).(io.ReadCloser), args.Error(1)
 }
 
+func (m *MockedClient) ImagePull(ctx context.Context, image string) (io.ReadCloser, error) {
+	args := m.Called(ctx, image)
+	return args.Get(0).(io.ReadCloser), args.Error(1)
+}
+
+func (m *MockedClient) ContainerInspect(ctx context.Context, containerID string) (docker_types.InspectResponse, error) {
+	args := m.Called(ctx, containerID)
+	return args.Get(0).(docker_types.InspectResponse), args.Error(1)
+}
+
+func (m *MockedClient) ContainerRemove(ctx context.Context, containerID string) error {
+	args := m.Called(ctx, containerID)
+	return args.Error(0)
+}
+
+func (m *MockedClient) ContainerCreate(ctx context.Context, inspectResp docker_types.InspectResponse, name string) (string, error) {
+	args := m.Called(ctx, inspectResp, name)
+	return args.String(0), args.Error(1)
+}
+
+func (m *MockedClient) ServiceUpdate(ctx context.Context, serviceID string, image string) error {
+	args := m.Called(ctx, serviceID, image)
+	return args.Error(0)
+}
+
 func (m *MockedClient) Host() container.Host {
 	args := m.Called()
 	return args.Get(0).(container.Host)
@@ -70,11 +96,11 @@ func (m *MockedClient) SystemInfo() system.Info {
 	return system.Info{ID: "123"}
 }
 
-func createHandler(client container.Client, content fs.FS, config Config) *chi.Mux {
+func createHandler(client docker_support.DockerUpdateClient, content fs.FS, config Config) *chi.Mux {
 	return createHandlerWithScanner(client, content, config, nil)
 }
 
-func createHandlerWithScanner(client container.Client, content fs.FS, config Config, scanner TrivyScanner) *chi.Mux {
+func createHandlerWithScanner(client docker_support.DockerUpdateClient, content fs.FS, config Config, scanner TrivyScanner) *chi.Mux {
 	if client == nil {
 		client = new(MockedClient)
 		client.(*MockedClient).On("ListContainers", mock.Anything, mock.Anything).Return([]container.Container{}, nil)
@@ -100,6 +126,6 @@ func createHandlerWithScanner(client container.Client, content fs.FS, config Con
 	})
 }
 
-func createDefaultHandler(client container.Client) *chi.Mux {
+func createDefaultHandler(client docker_support.DockerUpdateClient) *chi.Mux {
 	return createHandler(client, nil, Config{Base: "/", Authorization: Authorization{Provider: NONE}})
 }

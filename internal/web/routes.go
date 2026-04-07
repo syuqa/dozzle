@@ -58,6 +58,7 @@ type Config struct {
 	DisableAvatars      bool
 	ReleaseCheckMode    ReleaseCheckMode
 	Labels              container.ContainerLabels
+	OnCloudSetup        func()
 }
 
 type Authorization struct {
@@ -163,6 +164,7 @@ func createRouter(h *handler) *chi.Mux {
 
 				// Action
 				if h.config.EnableActions {
+					r.Post("/hosts/{host}/containers/{id}/actions/update", h.containerUpdate)
 					r.Post("/hosts/{host}/containers/{id}/actions/{action}", h.containerActions)
 				}
 				if h.config.EnableContainerScan {

@@ -40,6 +40,7 @@ type ClientService interface {
 	ListContainers(ctx context.Context, filter container.ContainerLabels) ([]container.Container, error)
 	Host(ctx context.Context) (container.Host, error)
 	ContainerAction(ctx context.Context, container container.Container, action container.ContainerAction) error
+	UpdateContainer(ctx context.Context, container container.Container, progressCh chan<- container.UpdateProgress) (bool, error)
 	LogsBetweenDates(ctx context.Context, container container.Container, from time.Time, to time.Time, stdTypes container.StdType) (<-chan *container.LogEvent, error)
 	RawLogs(ctx context.Context, container container.Container, from time.Time, to time.Time, stdTypes container.StdType) (io.ReadCloser, error)
 	SubscribeStats(context.Context, chan<- container.ContainerStat)
@@ -64,6 +65,9 @@ type server struct {
 }
 
 func newServer(service ClientService, dozzleVersion string, notificationHandler NotificationConfigHandler, scanRunner ScanRunner) pb.AgentServiceServer {
+	if notificationHandler == nil {
+		log.Fatal().Msg("No notification config handler registered")
+	}
 	return &server{
 		service:                   service,
 		version:                   dozzleVersion,
@@ -173,10 +177,11 @@ func (s *server) StreamEvents(in *pb.StreamEventsRequest, out pb.AgentService_St
 		case event := <-events:
 			out.Send(&pb.StreamEventsResponse{
 				Event: &pb.ContainerEvent{
-					ActorId:   event.ActorID,
-					Name:      event.Name,
-					Host:      event.Host,
-					Timestamp: timestamppb.New(event.Time),
+					ActorId:         event.ActorID,
+					Name:            event.Name,
+					Host:            event.Host,
+					Timestamp:       timestamppb.New(event.Time),
+					ActorAttributes: event.ActorAttributes,
 				},
 			})
 		case <-out.Context().Done():
@@ -335,6 +340,35 @@ func (s *server) ContainerAction(ctx context.Context, in *pb.ContainerActionRequ
 	return &pb.ContainerActionResponse{}, nil
 }
 
+func (s *server) UpdateContainer(req *pb.UpdateContainerRequest, out pb.AgentService_UpdateContainerServer) error {
+	c, err := s.service.FindContainer(out.Context(), req.ContainerId, container.ContainerLabels{})
+	if err != nil {
+		return status.Error(codes.NotFound, err.Error())
+	}
+
+	progressCh := make(chan container.UpdateProgress)
+	errCh := make(chan error, 1)
+
+	go func() {
+		_, err := s.service.UpdateContainer(out.Context(), c, progressCh)
+		errCh <- err
+	}()
+
+	for progress := range progressCh {
+		if err := out.Send(&pb.UpdateContainerProgress{
+			Status:  progress.Status,
+			Layer:   progress.Layer,
+			Current: progress.Current,
+			Total:   progress.Total,
+			Error:   progress.Error,
+		}); err != nil {
+			return err
+		}
+	}
+
+	return <-errCh
+}
+
 // terminalMessage represents a message from a terminal gRPC stream (exec or attach)
 type terminalMessage interface {
 	GetStdin() []byte
@@ -417,11 +451,6 @@ func (s *server) ContainerAttach(stream pb.AgentService_ContainerAttachServer) e
 }
 
 func (s *server) UpdateNotificationConfig(ctx context.Context, req *pb.UpdateNotificationConfigRequest) (*pb.UpdateNotificationConfigResponse, error) {
-	if s.notificationConfigHandler == nil {
-		log.Warn().Msg("No notification config handler registered, ignoring config update")
-		return &pb.UpdateNotificationConfigResponse{}, nil
-	}
-
 	// Validate request sizes to prevent memory exhaustion
 	const maxSubscriptions = 1000
 	const maxDispatchers = 100
@@ -443,6 +472,7 @@ func (s *server) UpdateNotificationConfig(ctx context.Context, req *pb.UpdateNot
 			LogExpression:       sub.LogExpression,
 			ContainerExpression: sub.ContainerExpression,
 			MetricExpression:    sub.MetricExpression,
+			EventExpression:     sub.EventExpression,
 			Cooldown:            int(sub.Cooldown),
 			SampleWindow:        int(sub.SampleWindow),
 			StateTriggers:       append([]string(nil), sub.StateTriggers...),
@@ -461,10 +491,16 @@ func (s *server) UpdateNotificationConfig(ctx context.Context, req *pb.UpdateNot
 			URL:             d.Url,
 			Template:        d.Template,
 			Headers:         d.Headers,
+			APIKey:          d.ApiKey,
+			Prefix:          d.Prefix,
 			BotToken:        d.BotToken,
 			ChatID:          d.ChatId,
 			MessageThreadID: d.MessageThreadId,
 			ParseMode:       d.ParseMode,
+		}
+		if d.ExpiresAt != nil {
+			t := d.ExpiresAt.AsTime()
+			dispatchers[i].ExpiresAt = &t
 		}
 	}
 
@@ -479,10 +515,6 @@ func (s *server) UpdateNotificationConfig(ctx context.Context, req *pb.UpdateNot
 }
 
 func (s *server) GetNotificationStats(ctx context.Context, req *pb.GetNotificationStatsRequest) (*pb.GetNotificationStatsResponse, error) {
-	if s.notificationConfigHandler == nil {
-		return &pb.GetNotificationStatsResponse{}, nil
-	}
-
 	stats := s.notificationConfigHandler.GetNotificationStats()
 
 	pbStats := make([]*pb.NotificationSubscriptionStats, len(stats))
