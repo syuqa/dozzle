@@ -65,7 +65,7 @@ export function useAlertForm(options: AlertFormOptions) {
     });
   }
 
-  async function saveAlert(kind: "log" | "metric" | "scan", typeSpecificFields: Record<string, unknown>) {
+  async function saveAlert(kind: "log" | "metric" | "scan" | "state", typeSpecificFields: Record<string, unknown>) {
     isSaving.value = true;
     saveError.value = null;
     try {

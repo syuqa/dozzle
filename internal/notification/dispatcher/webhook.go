@@ -52,6 +52,10 @@ func NewWebhookDispatcher(name, url, templateStr string, headers map[string]stri
 	return w, nil
 }
 
+func (w *WebhookDispatcher) WithTemplate(templateText string) (Dispatcher, error) {
+	return NewWebhookDispatcher(w.Name, w.URL, templateText, w.Headers)
+}
+
 // TestResult contains the result of a webhook test
 type TestResult struct {
 	Success    bool
@@ -130,15 +134,11 @@ func executeJSONTemplate(templateText string, data any) ([]byte, error) {
 	var structure any
 	if err := json.Unmarshal([]byte(templateText), &structure); err != nil {
 		// Not valid JSON — fall back to raw text/template execution
-		tmpl, parseErr := template.New("webhook").Parse(templateText)
-		if parseErr != nil {
-			return nil, fmt.Errorf("failed to parse template: %w", parseErr)
+		rendered, execErr := executeTextTemplate(templateText, data)
+		if execErr != nil {
+			return nil, execErr
 		}
-		var buf bytes.Buffer
-		if execErr := tmpl.Execute(&buf, data); execErr != nil {
-			return nil, fmt.Errorf("failed to execute template: %w", execErr)
-		}
-		return buf.Bytes(), nil
+		return []byte(rendered), nil
 	}
 
 	resolved, err := resolveTemplateValues(structure, data)

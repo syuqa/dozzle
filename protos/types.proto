@@ -103,6 +103,9 @@ message NotificationSubscription {
   string metricExpression = 7;
   int32 cooldown = 8;
   int32 sampleWindow = 9;
+  repeated string stateTriggers = 10;
+  int32 holdoffSeconds = 11;
+  string template = 12;
 }
 
 message NotificationDispatcher {
@@ -112,6 +115,10 @@ message NotificationDispatcher {
   string url = 4;
   string template = 5;
   map<string, string> headers = 6;
+  string botToken = 7;
+  string chatId = 8;
+  string messageThreadId = 9;
+  string parseMode = 10;
 }
 
 message NotificationSubscriptionStats {

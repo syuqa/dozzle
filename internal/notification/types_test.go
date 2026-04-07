@@ -268,3 +268,58 @@ func TestFromLogEvent_OrderedMapConversion(t *testing.T) {
 		})
 	}
 }
+
+func TestSubscription_ValidateStateAlert(t *testing.T) {
+	sub := &Subscription{
+		ContainerExpression: `name contains "api"`,
+		StateTriggers:       []string{StateTriggerStopped, StateTriggerError},
+		HoldoffSeconds:      20,
+	}
+
+	require.NoError(t, sub.Validate())
+	assert.True(t, sub.IsStateAlert())
+	assert.Equal(t, 20, sub.GetHoldoffSeconds())
+}
+
+func TestSubscription_ValidateRejectsMixedKinds(t *testing.T) {
+	sub := &Subscription{
+		LogExpression:  `level == "error"`,
+		StateTriggers:  []string{StateTriggerStopped},
+		HoldoffSeconds: 5,
+	}
+
+	require.Error(t, sub.Validate())
+}
+
+func TestDetectStateTriggers(t *testing.T) {
+	previous := container.Container{
+		ID:     "abc",
+		Name:   "api",
+		Image:  "repo/api:1.0.0",
+		State:  "running",
+		Health: "healthy",
+		Host:   "host-1",
+	}
+	current := container.Container{
+		ID:     "abc",
+		Name:   "api",
+		Image:  "repo/api:1.1.0",
+		State:  "exited",
+		Health: "unhealthy",
+		Host:   "host-1",
+	}
+	event := container.ContainerEvent{
+		Name:            "die",
+		ActorID:         "abc",
+		Host:            "host-1",
+		ActorAttributes: map[string]string{"exitCode": "1"},
+	}
+
+	triggers := detectStateTriggers(previous, current, event)
+
+	assert.Contains(t, triggers, StateTriggerImageUpdated)
+	assert.Contains(t, triggers, StateTriggerStopped)
+	assert.Contains(t, triggers, StateTriggerError)
+	assert.Contains(t, triggers, StateTriggerUnhealthy)
+	assert.Equal(t, "1", triggers[StateTriggerError].ExitCode)
+}

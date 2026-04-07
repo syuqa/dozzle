@@ -575,18 +575,25 @@ func (c *Client) UpdateNotificationConfig(ctx context.Context, subscriptions []t
 			MetricExpression:    sub.MetricExpression,
 			Cooldown:            int32(sub.Cooldown),
 			SampleWindow:        int32(sub.SampleWindow),
+			StateTriggers:       append([]string(nil), sub.StateTriggers...),
+			HoldoffSeconds:      int32(sub.HoldoffSeconds),
+			Template:            sub.Template,
 		}
 	}
 
 	pbDispatchers := make([]*pb.NotificationDispatcher, len(dispatchers))
 	for i, d := range dispatchers {
 		pbDispatchers[i] = &pb.NotificationDispatcher{
-			Id:       int32(d.ID),
-			Name:     d.Name,
-			Type:     d.Type,
-			Url:      d.URL,
-			Template: d.Template,
-			Headers:  d.Headers,
+			Id:              int32(d.ID),
+			Name:            d.Name,
+			Type:            d.Type,
+			Url:             d.URL,
+			Template:        d.Template,
+			Headers:         d.Headers,
+			BotToken:        d.BotToken,
+			ChatId:          d.ChatID,
+			MessageThreadId: d.MessageThreadID,
+			ParseMode:       d.ParseMode,
 		}
 	}
 

@@ -445,6 +445,9 @@ func (s *server) UpdateNotificationConfig(ctx context.Context, req *pb.UpdateNot
 			MetricExpression:    sub.MetricExpression,
 			Cooldown:            int(sub.Cooldown),
 			SampleWindow:        int(sub.SampleWindow),
+			StateTriggers:       append([]string(nil), sub.StateTriggers...),
+			HoldoffSeconds:      int(sub.HoldoffSeconds),
+			Template:            sub.Template,
 		}
 	}
 
@@ -452,12 +455,16 @@ func (s *server) UpdateNotificationConfig(ctx context.Context, req *pb.UpdateNot
 	dispatchers := make([]types.DispatcherConfig, len(req.Dispatchers))
 	for i, d := range req.Dispatchers {
 		dispatchers[i] = types.DispatcherConfig{
-			ID:       int(d.Id),
-			Name:     d.Name,
-			Type:     d.Type,
-			URL:      d.Url,
-			Template: d.Template,
-			Headers:  d.Headers,
+			ID:              int(d.Id),
+			Name:            d.Name,
+			Type:            d.Type,
+			URL:             d.Url,
+			Template:        d.Template,
+			Headers:         d.Headers,
+			BotToken:        d.BotToken,
+			ChatID:          d.ChatId,
+			MessageThreadID: d.MessageThreadId,
+			ParseMode:       d.ParseMode,
 		}
 	}
 
