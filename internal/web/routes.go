@@ -7,6 +7,7 @@ import (
 
 	"net/http"
 	"strings"
+	"sync"
 
 	"github.com/amir20/dozzle/internal/auth"
 	"github.com/amir20/dozzle/internal/container"
@@ -43,6 +44,7 @@ type Config struct {
 	Hostname            string
 	AppName             string
 	AppLogoURL          string
+	PublicURL           string
 	ScanStatusEndpoint  string
 	LogIncidentEndpoint string
 	LogIncidentDebug    bool
@@ -54,6 +56,8 @@ type Config struct {
 	EnableContainerScan bool
 	TrivyPath           string
 	ScanManager         ScanManager
+	CardTemplateManager CardTemplateManager
+	CardReportManager   CardReportManager
 	EnableShell         bool
 	DisableAvatars      bool
 	ReleaseCheckMode    ReleaseCheckMode
@@ -75,6 +79,7 @@ type Authorizer interface {
 
 type HostService interface {
 	FindContainer(host string, id string, labels container.ContainerLabels) (*container_support.ContainerService, error)
+	FindContainerByLabel(labelKey string, labelValue string, labels container.ContainerLabels) (*container_support.ContainerService, error)
 	ListContainersForHost(host string, labels container.ContainerLabels) ([]container.Container, error)
 	ListAllContainers(labels container.ContainerLabels) ([]container.Container, []error)
 	ListAllContainersFiltered(userFilter container.ContainerLabels, filter container_support.ContainerFilter) ([]container.Container, []error)
@@ -103,23 +108,32 @@ type HostService interface {
 }
 
 type handler struct {
-	content      fs.FS
-	config       *Config
-	hostService  HostService
-	trivyScanner TrivyScanner
-	scanManager  ScanManager
+	content             fs.FS
+	config              *Config
+	hostService         HostService
+	trivyScanner        TrivyScanner
+	scanManager         ScanManager
+	cardTemplateManager CardTemplateManager
+	cardReportManager   CardReportManager
+	autoInjected        sync.Map
+	reportCache         sync.Map
 }
 
 func CreateServer(hostService HostService, content fs.FS, config Config) *http.Server {
 	handler := &handler{
-		content:     content,
-		config:      &config,
-		hostService: hostService,
-		scanManager: config.ScanManager,
+		content:             content,
+		config:              &config,
+		hostService:         hostService,
+		scanManager:         config.ScanManager,
+		cardTemplateManager: config.CardTemplateManager,
+		cardReportManager:   config.CardReportManager,
 	}
 	if config.EnableContainerScan {
 		handler.trivyScanner = trivy.NewScanner(config.TrivyPath)
 	}
+
+	handler.startContainerCardAutoInjection()
+	handler.startContainerReportCacheInvalidation()
 
 	return &http.Server{Addr: config.Addr, Handler: createRouter(handler)}
 }
@@ -155,6 +169,7 @@ func createRouter(h *handler) *chi.Mux {
 				r.Get("/hosts/{host}/containers/{id}/logs/stream", h.streamContainerLogs)
 				r.Get("/hosts/{host}/logs/stream", h.streamHostLogs)
 				r.Get("/hosts/{host}/containers/{id}/logs", h.fetchLogsBetweenDates)
+				r.Get("/hosts/{host}/containers/{id}/env", h.getContainerEnv)
 				r.Post("/hosts/{host}/containers/{id}/logs/match-incident", h.matchLogIncident)
 				r.Get("/hosts/{host}/logs/mergedStream/{ids}", h.streamLogsMerged)
 				r.Get("/containers/{hostIds}/download", h.downloadLogs) // formatted as host:container,host:container
@@ -165,6 +180,7 @@ func createRouter(h *handler) *chi.Mux {
 				// Action
 				if h.config.EnableActions {
 					r.Post("/hosts/{host}/containers/{id}/actions/update", h.containerUpdate)
+					r.Post("/hosts/{host}/containers/{id}/actions/inject-logs-button", h.containerInjectLogsButton)
 					r.Post("/hosts/{host}/containers/{id}/actions/{action}", h.containerActions)
 				}
 				if h.config.EnableContainerScan {
@@ -217,6 +233,12 @@ func createRouter(h *handler) *chi.Mux {
 					r.Post("/test-webhook", h.testWebhook)
 				})
 
+				r.Get("/card-templates", h.listCardTemplates)
+				r.Put("/card-templates", h.replaceCardTemplates)
+				r.Get("/card-reports", h.listCardReports)
+				r.Put("/card-reports", h.replaceCardReports)
+				r.Get("/hosts/{host}/containers/{id}/detail-reports/{reportId}", h.runContainerDetailReport)
+
 				// Releases API
 				r.Get("/releases", h.getReleases)
 
@@ -235,6 +257,8 @@ func createRouter(h *handler) *chi.Mux {
 		})
 
 		r.Get("/healthcheck", h.healthcheck)
+		r.Get("/container/ref/{ref}", h.redirectContainerByLabel)
+		r.Get("/container/ref/{ref}/details", h.redirectContainerDetailsByLabel)
 
 		defaultHandler := http.StripPrefix(strings.Replace(base+"/", "//", "/", 1), http.HandlerFunc(h.index))
 		r.With(Brotli).Get("/*", func(w http.ResponseWriter, req *http.Request) {

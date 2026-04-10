@@ -1083,6 +1083,11 @@ func createDispatcher(config notification.DispatcherConfig) (dispatcher.Dispatch
 			config.ChatID,
 			config.MessageThreadID,
 			config.ParseMode,
+			config.ProxyType,
+			config.ProxyAddress,
+			config.ProxyUsername,
+			config.ProxyPassword,
+			config.ProxySecret,
 			config.Template,
 		)
 	default:

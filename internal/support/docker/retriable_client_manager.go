@@ -155,7 +155,15 @@ func (m *RetriableClientManager) String() string {
 }
 
 func (m *RetriableClientManager) Hosts(ctx context.Context) []container.Host {
+	started := time.Now()
+	caller := diagnosticCaller(3)
 	clients := m.List()
+	log.Debug().
+		Int("clients", len(clients)).
+		Int("failedAgents", len(m.failedAgents)).
+		Str("caller", caller).
+		Str("deadline", contextDeadlineValue(ctx)).
+		Msg("retriable manager hosts started")
 
 	hosts := lop.Map(clients, func(client container_support.ClientService, _ int) container.Host {
 		host, err := client.Host(ctx)
@@ -178,6 +186,12 @@ func (m *RetriableClientManager) Hosts(ctx context.Context) []container.Host {
 			Type:      "agent",
 		})
 	}
+
+	log.Debug().
+		Int("hosts", len(hosts)).
+		Str("caller", caller).
+		Dur("elapsed", time.Since(started)).
+		Msg("retriable manager hosts completed")
 
 	return hosts
 }

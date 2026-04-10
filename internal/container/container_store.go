@@ -3,6 +3,7 @@ package container
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -58,8 +59,18 @@ func NewContainerStore(ctx context.Context, client Client, statsCollect StatsCol
 
 var (
 	ErrContainerNotFound = errors.New("container not found")
+	ErrContainerFiltered = errors.New("container filtered out")
 	maxFetchParallelism  = int64(30)
 )
+
+func isContainerMissingError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "not found") || strings.Contains(message, "no such container")
+}
 
 func (s *ContainerStore) checkConnectivity() error {
 	if s.connected.CompareAndSwap(false, true) {
@@ -156,8 +167,12 @@ func (s *ContainerStore) ListContainers(labels ContainerLabels) ([]Container, er
 func (s *ContainerStore) FindContainer(id string, labels ContainerLabels) (Container, error) {
 	s.wg.Wait()
 	if labels.Exists() {
-		validContainers, err := s.client.ListContainers(s.ctx, labels)
+		ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+		defer cancel()
+
+		validContainers, err := s.client.ListContainers(ctx, labels)
 		if err != nil {
+			log.Error().Err(err).Str("id", id).Interface("labels", labels).Msg("failed to validate container against labels filter")
 			return Container{}, err
 		}
 
@@ -166,12 +181,13 @@ func (s *ContainerStore) FindContainer(id string, labels ContainerLabels) (Conta
 		})
 
 		if _, ok := validIDMap[id]; !ok {
-			log.Warn().Str("id", id).Msg("user doesn't have access to container")
-			return Container{}, ErrContainerNotFound
+			log.Debug().Str("id", id).Msg("container is hidden by labels filter")
+			return Container{}, ErrContainerFiltered
 		}
 	}
 
 	var updated bool
+	var removed bool
 	container, found := s.containers.Compute(id, func(c *Container, loaded bool) (*Container, xsync.ComputeOp) {
 		if !loaded {
 			return nil, xsync.CancelOp
@@ -186,13 +202,19 @@ func (s *ContainerStore) FindContainer(id string, labels ContainerLabels) (Conta
 			updated = true
 			return &newContainer, xsync.UpdateOp
 		} else {
+			if isContainerMissingError(err) {
+				removed = true
+				log.Warn().Str("id", id).Msg("stale container removed from store")
+				return nil, xsync.DeleteOp
+			}
+
 			log.Error().Err(err).Msg("failed to fetch container")
 			return c, xsync.CancelOp
 		}
 	})
 
-	if !found {
-		log.Warn().Str("id", id).Msg("container not found")
+	if !found || removed {
+		log.Debug().Str("id", id).Msg("container not found")
 		return Container{}, ErrContainerNotFound
 	}
 

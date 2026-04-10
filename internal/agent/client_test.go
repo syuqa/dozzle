@@ -1,8 +1,10 @@
 package agent
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -214,4 +216,51 @@ func TestRunContainerScan(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, wantedContainer.Image, result.Image)
 	assert.Equal(t, 1, result.Summary.High)
+}
+
+type nonInteractiveExecReader struct{}
+
+func (r *nonInteractiveExecReader) ReadEvent() (*container.ExecEvent, error) {
+	return nil, errors.New("done")
+}
+
+func (r *nonInteractiveExecReader) Interactive() bool {
+	return false
+}
+
+func TestExecPropagatesNonInteractiveModeToAgent(t *testing.T) {
+	rpc, err := NewClient("passthrough://bufnet", certs, grpc.WithContextDialer(bufDialer))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	execCall := mockService.On(
+		"Exec",
+		mock.Anything,
+		wantedContainer,
+		[]string{"echo", "test"},
+		mock.MatchedBy(func(reader container.ExecEventReader) bool {
+			modeReader, ok := reader.(container.ExecModeReader)
+			return ok && !modeReader.Interactive()
+		}),
+		mock.Anything,
+	).Return(nil).Once()
+	defer func() {
+		mockService.ExpectedCalls = removeExpectedCall(mockService.ExpectedCalls, execCall)
+	}()
+
+	var stdout bytes.Buffer
+	err = rpc.Exec(context.Background(), "123456", []string{"echo", "test"}, &nonInteractiveExecReader{}, &stdout)
+	assert.NoError(t, err)
+	mockService.AssertCalled(t, "Exec", mock.Anything, wantedContainer, []string{"echo", "test"}, mock.Anything, mock.Anything)
+}
+
+func removeExpectedCall(calls []*mock.Call, target *mock.Call) []*mock.Call {
+	filtered := calls[:0]
+	for _, call := range calls {
+		if call != target {
+			filtered = append(filtered, call)
+		}
+	}
+	return filtered
 }

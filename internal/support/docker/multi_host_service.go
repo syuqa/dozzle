@@ -2,6 +2,7 @@ package docker_support
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"sync"
@@ -50,29 +51,191 @@ func NewMultiHostService(manager ClientManager, timeout time.Duration) *MultiHos
 }
 
 func (m *MultiHostService) FindContainer(host string, id string, labels container.ContainerLabels) (*container_support.ContainerService, error) {
+	started := time.Now()
+	caller := diagnosticCaller(3)
 	client, ok := m.manager.Find(host)
 	if !ok {
 		return nil, fmt.Errorf("host %s not found", host)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), m.timeout)
 	defer cancel()
+	log.Debug().
+		Str("host", host).
+		Str("container", id).
+		Interface("labels", labels).
+		Str("caller", caller).
+		Str("timeout", m.timeout.String()).
+		Msg("multi-host find container started")
 	container, err := client.FindContainer(ctx, id, labels)
 	if err != nil {
+		log.Warn().
+			Err(err).
+			Str("host", host).
+			Str("container", id).
+			Interface("labels", labels).
+			Str("caller", caller).
+			Dur("elapsed", time.Since(started)).
+			Msg("multi-host find container failed")
 		return nil, err
 	}
+	log.Debug().
+		Str("host", host).
+		Str("container", id).
+		Str("caller", caller).
+		Dur("elapsed", time.Since(started)).
+		Msg("multi-host find container completed")
 
 	return container_support.NewContainerService(client, container), nil
 }
 
+func (m *MultiHostService) FindContainerByLabel(labelKey string, labelValue string, labels container.ContainerLabels) (*container_support.ContainerService, error) {
+	started := time.Now()
+	caller := diagnosticCaller(3)
+	clients := m.manager.List()
+
+	log.Debug().
+		Str("labelKey", labelKey).
+		Str("labelValue", labelValue).
+		Interface("labels", labels).
+		Int("clients", len(clients)).
+		Str("caller", caller).
+		Str("timeout", m.timeout.String()).
+		Msg("multi-host find container by label started")
+
+	ctx, cancel := context.WithTimeout(context.Background(), m.timeout)
+	defer cancel()
+
+	type result struct {
+		service   container_support.ClientService
+		container container.Container
+		err       error
+	}
+
+	results := make(chan result, len(clients))
+	var wg sync.WaitGroup
+
+	for _, client := range clients {
+		wg.Add(1)
+		go func(client container_support.ClientService) {
+			defer wg.Done()
+
+			containers, err := client.ListContainers(ctx, labels)
+			if err != nil {
+				results <- result{err: err}
+				return
+			}
+
+			for _, c := range containers {
+				if c.Labels[labelKey] == labelValue {
+					results <- result{service: client, container: c}
+					return
+				}
+			}
+
+			results <- result{}
+		}(client)
+	}
+
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	var matched *container_support.ContainerService
+	var firstErr error
+
+	for res := range results {
+		if res.err != nil {
+			if firstErr == nil {
+				firstErr = res.err
+			}
+			continue
+		}
+
+		if res.service == nil {
+			continue
+		}
+
+		if matched != nil && matched.Container.ID != res.container.ID {
+			log.Warn().
+				Str("labelKey", labelKey).
+				Str("labelValue", labelValue).
+				Str("firstContainer", matched.Container.ID).
+				Str("secondContainer", res.container.ID).
+				Dur("elapsed", time.Since(started)).
+				Msg("multi-host find container by label found multiple matches")
+			return nil, fmt.Errorf("multiple containers matched the same link id")
+		}
+
+		matched = container_support.NewContainerService(res.service, res.container)
+		cancel()
+	}
+
+	if matched != nil {
+		log.Debug().
+			Str("labelKey", labelKey).
+			Str("labelValue", labelValue).
+			Str("container", matched.Container.ID).
+			Str("host", matched.Container.Host).
+			Dur("elapsed", time.Since(started)).
+			Msg("multi-host find container by label completed")
+		return matched, nil
+	}
+
+	if firstErr != nil {
+		log.Warn().
+			Err(firstErr).
+			Str("labelKey", labelKey).
+			Str("labelValue", labelValue).
+			Dur("elapsed", time.Since(started)).
+			Msg("multi-host find container by label failed")
+		return nil, firstErr
+	}
+
+	log.Debug().
+		Str("labelKey", labelKey).
+		Str("labelValue", labelValue).
+		Dur("elapsed", time.Since(started)).
+		Msg("multi-host find container by label not found")
+	return nil, errors.New("container not found")
+}
+
 func (m *MultiHostService) ListContainersForHost(host string, labels container.ContainerLabels) ([]container.Container, error) {
+	started := time.Now()
+	caller := diagnosticCaller(3)
 	client, ok := m.manager.Find(host)
 	if !ok {
 		return nil, fmt.Errorf("host %s not found", host)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), m.timeout)
 	defer cancel()
+	log.Debug().
+		Str("host", host).
+		Interface("labels", labels).
+		Str("caller", caller).
+		Str("timeout", m.timeout.String()).
+		Msg("multi-host list containers started")
 
-	return client.ListContainers(ctx, labels)
+	containers, err := client.ListContainers(ctx, labels)
+	if err != nil {
+		log.Warn().
+			Err(err).
+			Str("host", host).
+			Interface("labels", labels).
+			Str("caller", caller).
+			Dur("elapsed", time.Since(started)).
+			Msg("multi-host list containers failed")
+		return nil, err
+	}
+
+	log.Debug().
+		Str("host", host).
+		Interface("labels", labels).
+		Int("count", len(containers)).
+		Str("caller", caller).
+		Dur("elapsed", time.Since(started)).
+		Msg("multi-host list containers completed")
+	return containers, nil
 }
 
 func (m *MultiHostService) ListAllContainers(labels container.ContainerLabels) ([]container.Container, []error) {
@@ -278,6 +441,11 @@ func (m *MultiHostService) broadcastNotificationConfig() {
 			ChatID:          d.ChatID,
 			MessageThreadID: d.MessageThreadID,
 			ParseMode:       d.ParseMode,
+			ProxyType:       d.ProxyType,
+			ProxyAddress:    d.ProxyAddress,
+			ProxyUsername:   d.ProxyUsername,
+			ProxyPassword:   d.ProxyPassword,
+			ProxySecret:     d.ProxySecret,
 		}
 	}
 

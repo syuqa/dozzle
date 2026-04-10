@@ -32,6 +32,7 @@ type ExecSession struct {
 	Writer io.WriteCloser
 	Reader io.Reader
 	Resize func(width uint, height uint) error
+	Tty    bool
 }
 
 type ExecEvent struct {
@@ -44,6 +45,11 @@ type ExecEvent struct {
 // ExecEventReader provides structured exec events (userinput, resize)
 type ExecEventReader interface {
 	ReadEvent() (*ExecEvent, error)
+}
+
+type ExecModeReader interface {
+	ExecEventReader
+	Interactive() bool
 }
 
 type Client interface {

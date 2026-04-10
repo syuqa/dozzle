@@ -33,6 +33,7 @@ type Manager struct {
 	cancel              context.CancelFunc
 	sendSem             *semaphore.Weighted
 	containerSnapshots  *xsync.Map[string, container.Container]
+	identitySnapshots   *xsync.Map[string, container.Container]
 	pendingStateChecks  *xsync.Map[string, int64]
 	stateCheckCounter   atomic.Int64
 }
@@ -52,6 +53,7 @@ func NewManager(listener *ContainerLogListener, statsListener *ContainerStatsLis
 		cancel:             cancel,
 		sendSem:            semaphore.NewWeighted(5),
 		containerSnapshots: xsync.NewMap[string, container.Container](),
+		identitySnapshots:  xsync.NewMap[string, container.Container](),
 		pendingStateChecks: xsync.NewMap[string, int64](),
 	}
 
@@ -71,6 +73,7 @@ func NewManager(listener *ContainerLogListener, statsListener *ContainerStatsLis
 func (m *Manager) Start() error {
 	for _, c := range m.listener.ListContainers() {
 		m.containerSnapshots.Store(containerStateKey(c.Host, c.ID), c)
+		m.identitySnapshots.Store(containerIdentityKey(c.Host, c), c)
 	}
 	m.eventListener.Start()
 	return m.listener.Start(m)

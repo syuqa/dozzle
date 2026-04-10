@@ -180,6 +180,51 @@
 
       <Toggle v-model="showAllContainers">{{ $t("settings.show-stopped-containers") }}</Toggle>
     </section>
+
+    <section class="flex flex-col gap-4">
+      <div class="has-underline">
+        <h2>{{ $t("card-templates.title") }}</h2>
+      </div>
+
+      <p class="text-base-content/70 max-w-4xl text-sm">
+        {{ $t("settings.card-templates-description") }}
+      </p>
+
+      <div class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto]">
+        <div class="rounded-box border-base-content/10 bg-base-100 border p-4">
+          <div v-if="!cardTemplatesLoaded" class="text-base-content/60 text-sm">
+            {{ $t("settings.loading-card-templates") }}
+          </div>
+          <div v-else-if="cardTemplatesError" class="text-error text-sm">
+            {{ cardTemplatesError }}
+          </div>
+          <ul v-else class="space-y-2">
+            <li
+              v-for="template in cardTemplates"
+              :key="template.id"
+              class="bg-base-200/60 rounded-box flex items-center justify-between gap-3 px-3 py-2 text-sm"
+            >
+              <div class="min-w-0">
+                <div class="truncate font-medium">{{ template.name }}</div>
+                <div class="text-base-content/60 truncate text-xs">
+                  {{ template.filter || $t("card-templates.default-template") }}
+                </div>
+              </div>
+              <span class="badge shrink-0" :class="template.enabled ? 'badge-success badge-outline' : 'badge-ghost'">
+                {{ template.enabled ? $t("card-templates.enabled") : $t("card-templates.disabled") }}
+              </span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="flex items-start">
+          <router-link to="/settings/cards" class="btn btn-primary">
+            <mdi:card-text-outline />
+            {{ $t("settings.open-card-templates") }}
+          </router-link>
+        </div>
+      </div>
+    </section>
   </PageWithLinks>
 </template>
 
@@ -202,10 +247,12 @@ import {
   locale,
   groupContainers,
 } from "@/stores/settings";
+import { useContainerCardTemplates } from "@/stores/containerCardTemplates";
 
 import { availableLocales, i18n } from "@/modules/i18n";
 
 const { t } = useI18n();
+const { templates: cardTemplates, loaded: cardTemplatesLoaded, error: cardTemplatesError } = useContainerCardTemplates();
 
 setTitle(t("title.settings"));
 const { latestRelease, hasRelease } = useAnnouncements();

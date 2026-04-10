@@ -47,6 +47,8 @@ label:
   scanning: Сканирование...
   scan-not-scanned: Нет сканирования
   scan-manual: Вручную
+  table-view: Таблица
+  card-view: Карточки
   every-minutes: Каждые {count} мин
   pinned: Закреплено
   per-page: Строк на странице
@@ -90,6 +92,173 @@ title:
   login: Требуется авторизация
   dashboard: 1 контейнер | {count} контейнеров
   settings: Настройки
+card-templates:
+  title: Шаблоны карточек
+  add-template: Добавить шаблон
+  create-template: Создать шаблон
+  edit-template: Редактировать шаблон
+  default-name: По умолчанию
+  new-template: Новый шаблон
+  description: Настройте карточки контейнеров через шаблоны, которые применяются к контейнерам по фильтру. Используется первый подходящий включённый шаблон.
+  form-description: Создавайте общие шаблоны карточек и управляйте тем, к каким контейнерам они применяются через фильтр.
+  templates-list: Шаблоны
+  filter-help-title: Синтаксис фильтра
+  display-options: Параметры отображения
+  enabled: Включен
+  disabled: Выключен
+  default-template: Шаблон по умолчанию без фильтра
+  name: Имя шаблона
+  icon-url: Иконка
+  icon-url-placeholder: /icons/backend.svg или data:image/svg+xml,...
+  filter: Фильтр контейнера
+  filter-placeholder: 'name contains "backend" && host == "prod-host"'
+  filter-hint: 'Поддерживаются поля: name, image, host, state, group, namespace, health, id, label:<key>. Операторы: == и contains. Условия соединяются через &&.'
+  show-host: Показывать хост
+  show-state: Показывать статус
+  show-created: Показывать дату создания
+  show-details: Показывать кнопку деталей
+  show-actions: Показывать действия
+  open-details: Открыть детали
+  actions: Действия
+  inject-logs-button: Инъекция кнопки логов
+  inject-index-path: Путь к index.html
+  inject-alias-source: Alias
+  inject-success: Кнопка логов внедрена
+  extra-fields: Дополнительные поля
+  extra-fields-description: Добавьте встроенные атрибуты контейнера или label-поля в тело карточки.
+  detail-fields: Детали контейнера
+  detail-fields-description: Настройте, какие поля показываются на отдельной странице деталей контейнера.
+  detail-groups: Группы деталей
+  detail-groups-description: Разделите параметры страницы деталей на группы. Каждая группа будет показана в отдельном блоке.
+  add-detail-group: Добавить группу
+  no-detail-groups: Группы деталей ещё не настроены.
+  detail-reports-description: Настройте отдельные отчёты для страницы деталей. Они будут показаны отдельными блоками ниже групп параметров.
+  add-detail-report: Добавить отчёт
+  no-detail-reports: Отчёты деталей ещё не настроены.
+  group-name: Название группы
+  default-detail-group: Общие
+  add-detail-field: Добавить поле деталей
+  no-detail-fields: Поля деталей ещё не настроены.
+  detail-fields-count-label: "{count} полей деталей"
+  groups-count-label: "{count} групп"
+  add-field: Добавить поле
+  no-extra-fields: Дополнительные поля ещё не настроены.
+  fields-count: полей
+  fields-count-label: "{count} полей"
+  field-label: Название поля
+  field-source-hint: Встроенное поле контейнера
+  drag-hint: Перетаскивайте шаблоны и поля, чтобы менять приоритет и порядок вывода.
+  preview: Предпросмотр
+  preview-meta: Проверка совпадения
+  preview-summary: Здесь показано, как текущий шаблон будет выглядеть сразу на нескольких запущенных контейнерах.
+  layout-summary: Макет карточки
+  layout-summary-description: Краткая сводка по тому, какие метаданные и дополнительные поля будут показаны на карточке.
+  preview-match: Совпадает с фильтром
+  preview-filter: Активный фильтр
+  preview-extra-fields: Активные дополнительные поля
+  preview-detail-fields: Поля страницы деталей
+  preview-container: Контейнер
+  preview-image: Образ
+  matched-count: Совпало контейнеров
+  visible-count: Контейнеров в предпросмотре
+  saving: Сохранение изменений...
+  saved: Изменения доступны всем пользователям
+  field-option-image: Образ
+  field-option-command: Команда
+  field-option-group: Группа
+  field-option-namespace: Пространство имён
+  field-option-health: Health check
+  field-option-id: ID контейнера
+  field-option-host: Хост
+  field-option-state: Статус
+  field-option-created: Создан
+  field-option-label: Label контейнера
+  state-running: Выполняется
+  state-exited: Остановлен
+  state-paused: Приостановлен
+  state-restarting: Перезапускается
+  state-created: Создан
+  state-dead: Недоступен
+  state-removing: Удаляется
+  match-yes: да
+  match-no: нет
+  open-logs: Открыть логи
+  details-page-title-suffix: детали
+  report-definitions: Отчёты контейнеров
+  add-report: Добавить отчёт
+  loading-reports: Загрузка отчётов...
+  create-report: Создать отчёт
+  edit-report: Изменить отчёт
+  new-report: Новый отчёт
+  report-form-description: Общие отчёты можно переиспользовать в полях страницы деталей для разных шаблонов карточек.
+  report-id: Идентификатор отчёта
+  report-description: Описание
+  report-command: Команда внутри контейнера
+  report-jql-template: JQL-шаблон
+  report-jql-placeholder: 'project = CB AND text ~ "\"{value}\"" ORDER BY updated DESC'
+  report-jql-description: 'Для parser Jira Issues это поле выполняется на backend Dozzle как JQL-шаблон. Доступны подстановки {value}, {field} и {row}.'
+  report-file-path: Путь к файлу
+  report-file-path-placeholder: /usr/local/tomcat/app/conf/cache.properties
+  report-file-pattern: Маска файлов
+  report-file-pattern-placeholder: "*.jar"
+  report-show-file-size: Показывать размер файла
+  report-show-checksum: Показывать SHA-256
+  report-exclude-patterns: Исключения
+  report-exclude-patterns-placeholder: org.unidata.mdm.system.cache*
+  report-exclude-patterns-description: Список glob-паттернов через запятую. Совпавшие параметры не попадут в таблицу.
+  report-linked-report-id: Связанный отчёт
+  report-linked-report-id-placeholder: report-jira-issues
+  report-linked-report-label: Текст кнопки отчёта
+  report-linked-report-label-placeholder: Open issues
+  report-parser: Парсер
+  report-parser-text: Текст
+  report-parser-json: JSON-отчёт
+  report-parser-jar_modules: Таблица JAR-модулей
+  report-parser-jira_issues: Список задач Jira
+  report-parser-properties_template: Шаблон properties
+  report-parser-file_listing: Список файлов
+  report-parser-file_content: Содержимое файла
+  report-display-mode: Отображение отчёта
+  report-display-inline: Встроенный блок
+  report-display-page: Отдельная страница
+  report-refresh-mode: Обновление отчёта
+  report-refresh-ttl: По времени
+  report-refresh-container_update: По обновлению контейнера
+  report-refresh-manual: Вручную
+  report-refresh-on_open: При открытии
+  report-timeout: Таймаут (сек)
+  report-cache-ttl: Кэш (сек)
+  kind-text: Текст
+  kind-container-field: Встроенное поле контейнера
+  kind-template-text: Текст -> переменная окружения
+  kind-static-text: Текст -> текст
+  kind-link: Ссылка
+  kind-report: Отчёт
+  detail-link-url-placeholder: 'https://wiki.example/{name}'
+  detail-link-text-placeholder: Открыть описание модуля
+  detail-template-text-placeholder: CACHE_GROUP
+  detail-template-text-hint: Укажите имя переменной окружения контейнера, например CACHE_GROUP или JAVA_OPTS.
+  detail-static-text-placeholder: Статичный текст без подстановок
+  detail-static-text-hint: Это поле выводит текст как есть, без подстановки переменных контейнера.
+  detail-report-placeholder: Выберите отчёт
+  report-loading: Загрузка отчёта...
+  show-vulnerabilities: Показывать отчёт по уязвимостям
+  vulnerability-report-title: Отчёт по уязвимостям
+  vulnerability-package-types: Типы пакетов
+  vulnerability-package-types-placeholder: jar, os, python-pkg
+  vulnerability-severities: Severity
+  vulnerability-all-package-types: Все типы пакетов
+  vulnerability-all-severities: Все уровни
+  vulnerability-loading: Загрузка отчёта по уязвимостям...
+  vulnerability-no-scan: Сохранённого результата сканирования нет.
+  collapse-section: Свернуть
+  expand-section: Развернуть
+  collapse-all-sections: Свернуть всё
+  expand-all-sections: Развернуть всё
+  section-navigation: Навигация по секциям
+  open-report: Открыть отчёт
+  report-page-title-suffix: отчёт
+  report-not-generated: Отчёт ещё не запускался. Нажмите «Обновить».
 button:
   logout: Выйти
   login: Войти
@@ -133,6 +302,9 @@ placeholder:
   search-containers: Поиск контейнеров (⌘ + k, ⌃k)
   search: Поиск
 settings:
+  card-templates-description: Общие шаблоны карточек управляют отображением карточек контейнеров для всех пользователей.
+  loading-card-templates: Загрузка шаблонов карточек...
+  open-card-templates: Открыть шаблоны карточек
   help-support: >
     Пожалуйста, поддержите Dozzle, сделав пожертвование или спонсорство на GitHub. Ваши вклады помогают нам улучшать Dozzle для всех. Спасибо! 🙏🏼
   display: Вид
@@ -270,7 +442,7 @@ notifications:
     name: Имя шаблона
     name-placeholder: например, Security summary
     body: Тело шаблона
-    body-placeholder: "{{ .Detail }}"
+    body-placeholder: "Пример: переменная dot-Detail"
     body-hint: Поддерживаются те же Go-переменные шаблона, что и в назначениях и оповещениях.
     cancel: Отмена
     create: Создать Шаблон
@@ -352,7 +524,13 @@ notifications:
     telegram-thread-id: Thread ID
     telegram-parse-mode: Parse mode
     telegram-no-parse-mode: Без форматирования
-    telegram-template-placeholder: "{{ .Detail }}"
+    telegram-proxy-type: Прокси
+    telegram-proxy-none: Без прокси
+    telegram-proxy-type-hint: SOCKS5-прокси для запросов Telegram Bot API.
+    telegram-proxy-address: Адрес прокси
+    telegram-proxy-username: Логин прокси
+    telegram-proxy-password: Пароль прокси
+    telegram-template-placeholder: "Пример: переменная dot-Detail"
     telegram-template-hint: Текстовый Go-шаблон. Поддерживает .Container, .Detail, .Subscription и другие поля уведомления.
     shared-template: Общий шаблон
     no-shared-template: Без общего шаблона

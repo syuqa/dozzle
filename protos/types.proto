@@ -129,6 +129,11 @@ message NotificationDispatcher {
   string chatId = 11;
   string messageThreadId = 12;
   string parseMode = 13;
+  string proxyType = 14;
+  string proxyAddress = 15;
+  string proxyUsername = 16;
+  string proxyPassword = 17;
+  string proxySecret = 18;
 }
 
 message NotificationSubscriptionStats {

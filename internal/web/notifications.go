@@ -55,6 +55,11 @@ type DispatcherResponse struct {
 	ChatID          *string           `json:"chatId,omitempty"`
 	MessageThreadID *string           `json:"messageThreadId,omitempty"`
 	ParseMode       *string           `json:"parseMode,omitempty"`
+	ProxyType       *string           `json:"proxyType,omitempty"`
+	ProxyAddress    *string           `json:"proxyAddress,omitempty"`
+	ProxyUsername   *string           `json:"proxyUsername,omitempty"`
+	ProxyPassword   *string           `json:"proxyPassword,omitempty"`
+	ProxySecret     *string           `json:"proxySecret,omitempty"`
 }
 
 type NotificationTemplateResponse struct {
@@ -106,6 +111,11 @@ type DispatcherInput struct {
 	ChatID          *string           `json:"chatId,omitempty"`
 	MessageThreadID *string           `json:"messageThreadId,omitempty"`
 	ParseMode       *string           `json:"parseMode,omitempty"`
+	ProxyType       *string           `json:"proxyType,omitempty"`
+	ProxyAddress    *string           `json:"proxyAddress,omitempty"`
+	ProxyUsername   *string           `json:"proxyUsername,omitempty"`
+	ProxyPassword   *string           `json:"proxyPassword,omitempty"`
+	ProxySecret     *string           `json:"proxySecret,omitempty"`
 }
 
 type PreviewInput struct {
@@ -141,6 +151,11 @@ type TestWebhookInput struct {
 	ChatID          *string           `json:"chatId,omitempty"`
 	MessageThreadID *string           `json:"messageThreadId,omitempty"`
 	ParseMode       *string           `json:"parseMode,omitempty"`
+	ProxyType       *string           `json:"proxyType,omitempty"`
+	ProxyAddress    *string           `json:"proxyAddress,omitempty"`
+	ProxyUsername   *string           `json:"proxyUsername,omitempty"`
+	ProxyPassword   *string           `json:"proxyPassword,omitempty"`
+	ProxySecret     *string           `json:"proxySecret,omitempty"`
 }
 
 type TestWebhookResult struct {
@@ -244,6 +259,26 @@ func dispatcherConfigToResponse(d *notification.DispatcherConfig) *DispatcherRes
 	if d.ParseMode != "" {
 		parseMode = &d.ParseMode
 	}
+	var proxyType *string
+	if d.ProxyType != "" {
+		proxyType = &d.ProxyType
+	}
+	var proxyAddress *string
+	if d.ProxyAddress != "" {
+		proxyAddress = &d.ProxyAddress
+	}
+	var proxyUsername *string
+	if d.ProxyUsername != "" {
+		proxyUsername = &d.ProxyUsername
+	}
+	var proxyPassword *string
+	if d.ProxyPassword != "" {
+		proxyPassword = &d.ProxyPassword
+	}
+	var proxySecret *string
+	if d.ProxySecret != "" {
+		proxySecret = &d.ProxySecret
+	}
 	return &DispatcherResponse{
 		ID:              d.ID,
 		Name:            d.Name,
@@ -258,6 +293,11 @@ func dispatcherConfigToResponse(d *notification.DispatcherConfig) *DispatcherRes
 		ChatID:          chatID,
 		MessageThreadID: messageThreadID,
 		ParseMode:       parseMode,
+		ProxyType:       proxyType,
+		ProxyAddress:    proxyAddress,
+		ProxyUsername:   proxyUsername,
+		ProxyPassword:   proxyPassword,
+		ProxySecret:     proxySecret,
 	}
 }
 
@@ -517,6 +557,11 @@ func (h *handler) createDispatcher(w http.ResponseWriter, r *http.Request) {
 		ParseMode:       derefString(input.ParseMode),
 		BotToken:        derefString(input.BotToken),
 		ChatID:          derefString(input.ChatID),
+		ProxyType:       derefString(input.ProxyType),
+		ProxyAddress:    derefString(input.ProxyAddress),
+		ProxyUsername:   derefString(input.ProxyUsername),
+		ProxyPassword:   derefString(input.ProxyPassword),
+		ProxySecret:     derefString(input.ProxySecret),
 	}
 	if input.URL != nil {
 		config.URL = *input.URL
@@ -542,6 +587,11 @@ func (h *handler) createDispatcher(w http.ResponseWriter, r *http.Request) {
 		ChatID:          input.ChatID,
 		MessageThreadID: input.MessageThreadID,
 		ParseMode:       input.ParseMode,
+		ProxyType:       input.ProxyType,
+		ProxyAddress:    input.ProxyAddress,
+		ProxyUsername:   input.ProxyUsername,
+		ProxyPassword:   input.ProxyPassword,
+		ProxySecret:     input.ProxySecret,
 	}
 	if len(input.Headers) > 0 {
 		resp.Headers = input.Headers
@@ -572,6 +622,11 @@ func (h *handler) updateDispatcher(w http.ResponseWriter, r *http.Request) {
 		ParseMode:       derefString(input.ParseMode),
 		BotToken:        derefString(input.BotToken),
 		ChatID:          derefString(input.ChatID),
+		ProxyType:       derefString(input.ProxyType),
+		ProxyAddress:    derefString(input.ProxyAddress),
+		ProxyUsername:   derefString(input.ProxyUsername),
+		ProxyPassword:   derefString(input.ProxyPassword),
+		ProxySecret:     derefString(input.ProxySecret),
 	}
 	if input.URL != nil {
 		config.URL = *input.URL
@@ -596,6 +651,11 @@ func (h *handler) updateDispatcher(w http.ResponseWriter, r *http.Request) {
 		ChatID:          input.ChatID,
 		MessageThreadID: input.MessageThreadID,
 		ParseMode:       input.ParseMode,
+		ProxyType:       input.ProxyType,
+		ProxyAddress:    input.ProxyAddress,
+		ProxyUsername:   input.ProxyUsername,
+		ProxyPassword:   input.ProxyPassword,
+		ProxySecret:     input.ProxySecret,
 	}
 	if len(input.Headers) > 0 {
 		resp.Headers = input.Headers
@@ -902,7 +962,27 @@ func (h *handler) testWebhook(w http.ResponseWriter, r *http.Request) {
 		if input.ParseMode != nil {
 			parseMode = *input.ParseMode
 		}
-		d, err := dispatcher.NewTelegramDispatcher("test", botToken, chatID, threadID, parseMode, templateStr)
+		proxyType := ""
+		if input.ProxyType != nil {
+			proxyType = *input.ProxyType
+		}
+		proxyAddress := ""
+		if input.ProxyAddress != nil {
+			proxyAddress = *input.ProxyAddress
+		}
+		proxyUsername := ""
+		if input.ProxyUsername != nil {
+			proxyUsername = *input.ProxyUsername
+		}
+		proxyPassword := ""
+		if input.ProxyPassword != nil {
+			proxyPassword = *input.ProxyPassword
+		}
+		proxySecret := ""
+		if input.ProxySecret != nil {
+			proxySecret = *input.ProxySecret
+		}
+		d, err := dispatcher.NewTelegramDispatcher("test", botToken, chatID, threadID, parseMode, proxyType, proxyAddress, proxyUsername, proxyPassword, proxySecret, templateStr)
 		if err != nil {
 			errStr := err.Error()
 			writeJSON(w, http.StatusOK, &TestWebhookResult{Success: false, Error: &errStr})

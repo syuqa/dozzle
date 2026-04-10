@@ -2,6 +2,7 @@ package k8s_support
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -56,6 +57,31 @@ func (m *K8sClusterService) FindContainer(host string, id string, labels contain
 	}
 
 	return container_support.NewContainerService(m.client, container), nil
+}
+
+func (m *K8sClusterService) FindContainerByLabel(labelKey string, labelValue string, labels container.ContainerLabels) (*container_support.ContainerService, error) {
+	containers, err := m.client.ListContainers(context.Background(), labels)
+	if err != nil {
+		return nil, err
+	}
+
+	var matched *container.Container
+	for _, c := range containers {
+		if c.Labels[labelKey] != labelValue {
+			continue
+		}
+		if matched != nil && matched.ID != c.ID {
+			return nil, fmt.Errorf("multiple containers matched the same link id")
+		}
+		copy := c
+		matched = &copy
+	}
+
+	if matched == nil {
+		return nil, errors.New("container not found")
+	}
+
+	return container_support.NewContainerService(m.client, *matched), nil
 }
 
 func (m *K8sClusterService) ListContainersForHost(host string, labels container.ContainerLabels) ([]container.Container, error) {

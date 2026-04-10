@@ -61,6 +61,11 @@ export interface Dispatcher {
   chatId?: string;
   messageThreadId?: string;
   parseMode?: string;
+  proxyType?: string;
+  proxyAddress?: string;
+  proxyUsername?: string;
+  proxyPassword?: string;
+  proxySecret?: string;
 }
 
 export interface NotificationTemplate {

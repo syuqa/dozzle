@@ -16,9 +16,13 @@ type Args struct {
 	Hostname            string              `arg:"env:DOZZLE_HOSTNAME" help:"sets the hostname for display. This is useful with multiple Dozzle instances."`
 	AppName             string              `arg:"env:DOZZLE_APP_NAME" help:"sets a custom application name in the web interface."`
 	AppLogoURL          string              `arg:"env:DOZZLE_APP_LOGO_URL" help:"sets a custom application logo URL in the web interface."`
+	PublicURL           string              `arg:"env:DOZZLE_PUBLIC_URL" help:"sets the public URL used for generated links and automatic container log button injection."`
 	ScanStatusEndpoint  string              `arg:"env:DOZZLE_SCAN_STATUS_ENDPOINT" help:"sets an optional endpoint for fetching external scan issue status/history."`
 	LogIncidentEndpoint string              `arg:"env:DOZZLE_LOG_INCIDENT_ENDPOINT" help:"sets an optional endpoint for matching log lines to incidents."`
 	LogIncidentDebug    bool                `arg:"env:DOZZLE_LOG_INCIDENT_DEBUG" default:"false" help:"shows debug badges for log incident matching state in the UI."`
+	EnvMaskPatterns     string              `arg:"env:DOZZLE_ENV_MASK_PATTERNS" help:"comma-separated env name masks hidden from container detail env lookups; supports substrings and glob patterns."`
+	FilePreviewFormats  string              `arg:"env:DOZZLE_FILE_PREVIEW_FORMATS" help:"comma-separated list of allowed file preview formats/extensions for file_content reports, for example: json,yaml,xml,html,txt,conf,properties."`
+	FilePreviewMaxBytes int                 `arg:"env:DOZZLE_FILE_PREVIEW_MAX_BYTES" help:"maximum preview size in bytes for file_content reports."`
 	Level               string              `arg:"env:DOZZLE_LEVEL" default:"info" help:"set Dozzle log level. Use debug for more logging."`
 	AuthProvider        string              `arg:"--auth-provider,env:DOZZLE_AUTH_PROVIDER" default:"none" help:"sets the auth provider to use. Currently only forward-proxy is supported."`
 	AuthTTL             string              `arg:"--auth-ttl,env:DOZZLE_AUTH_TTL" default:"session" help:"sets the TTL for the auth token. Accepts duration values like 12h. Valid time units are s, m, h"`

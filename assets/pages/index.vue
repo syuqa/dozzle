@@ -17,9 +17,14 @@
         <h2 class="text-lg font-semibold">
           {{ $t("label.container", { count: runningContainers.length }) }}
         </h2>
-        <button @click="containersCollapsed = !containersCollapsed" class="btn btn-ghost btn-sm">
-          <mdi:chevron-down :class="{ 'rotate-180': !containersCollapsed }" class="transition-transform" />
-        </button>
+        <div class="flex items-center gap-1">
+          <router-link to="/settings/cards" class="btn btn-ghost btn-sm" :title="$t('card-templates.title')">
+            <mdi:card-text-outline />
+          </router-link>
+          <button @click="containersCollapsed = !containersCollapsed" class="btn btn-ghost btn-sm">
+            <mdi:chevron-down :class="{ 'rotate-180': !containersCollapsed }" class="transition-transform" />
+          </button>
+        </div>
       </div>
       <Transition name="collapse">
         <ContainerTable v-show="!containersCollapsed" :containers="runningContainers" />

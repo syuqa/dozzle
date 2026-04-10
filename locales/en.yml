@@ -48,6 +48,8 @@ label:
   scanning: Scanning...
   scan-not-scanned: Not scanned
   scan-manual: Manual
+  table-view: Table view
+  card-view: Card view
   every-minutes: Every {count} min
   pinned: Pinned
   per-page: Rows per page
@@ -97,6 +99,173 @@ title:
   dashboard: 1 container | {count} containers
   settings: Settings
   notifications: Notifications
+card-templates:
+  title: Card Templates
+  add-template: Add Template
+  create-template: Create Template
+  edit-template: Edit Template
+  default-name: Default
+  new-template: New Template
+  description: Configure container cards by matching templates against running containers. The first enabled matching template is applied.
+  form-description: Create shared card templates and use filters to decide which containers they apply to.
+  templates-list: Templates
+  filter-help-title: Filter syntax
+  display-options: Display options
+  enabled: Enabled
+  disabled: Disabled
+  default-template: Default template without filter
+  name: Template name
+  icon-url: Icon
+  icon-url-placeholder: /icons/backend.svg or data:image/svg+xml,...
+  filter: Container filter
+  filter-placeholder: 'name contains "backend" && host == "prod-host"'
+  filter-hint: 'Supported fields: name, image, host, state, group, namespace, health, id, label:<key>. Operators: == and contains. Join conditions with &&.'
+  show-host: Show host
+  show-state: Show state
+  show-created: Show created
+  show-details: Show details button
+  show-actions: Show actions
+  open-details: Open details
+  actions: Actions
+  inject-logs-button: Inject logs button
+  inject-index-path: index.html path
+  inject-alias-source: Alias
+  inject-success: Logs button injected
+  extra-fields: Extra fields
+  extra-fields-description: Add built-in container attributes or labels to the card body.
+  detail-fields: Container details
+  detail-fields-description: Configure which fields are shown on the dedicated container details page.
+  detail-groups: Detail groups
+  detail-groups-description: Split details-page parameters into groups. Each group is rendered in its own block.
+  add-detail-group: Add group
+  no-detail-groups: No detail groups configured yet.
+  detail-reports-description: Configure dedicated details-page reports. They are shown as separate blocks below the parameter groups.
+  add-detail-report: Add report
+  no-detail-reports: No detail reports configured yet.
+  group-name: Group name
+  default-detail-group: General
+  add-detail-field: Add detail field
+  no-detail-fields: No detail fields configured yet.
+  detail-fields-count-label: "{count} detail fields"
+  groups-count-label: "{count} groups"
+  add-field: Add field
+  no-extra-fields: No extra fields configured yet.
+  fields-count: fields
+  fields-count-label: "{count} fields"
+  field-label: Field label
+  field-source-hint: Built-in container field
+  drag-hint: Drag templates and fields to change priority and layout order.
+  preview: Preview
+  preview-meta: Match preview
+  preview-summary: This preview shows how the current template will look on several running containers.
+  layout-summary: Card layout
+  layout-summary-description: Quick summary of which metadata and extra fields will be visible on the card.
+  preview-match: Matches filter
+  preview-filter: Active filter
+  preview-extra-fields: Active extra fields
+  preview-detail-fields: Details page fields
+  preview-container: Container
+  preview-image: Image
+  matched-count: Matched containers
+  visible-count: Previewed containers
+  saving: Saving changes...
+  saved: Changes are shared with all users
+  field-option-image: Image
+  field-option-command: Command
+  field-option-group: Group
+  field-option-namespace: Namespace
+  field-option-health: Health
+  field-option-id: Container ID
+  field-option-host: Host
+  field-option-state: State
+  field-option-created: Created
+  field-option-label: Container Label
+  state-running: Running
+  state-exited: Exited
+  state-paused: Paused
+  state-restarting: Restarting
+  state-created: Created
+  state-dead: Dead
+  state-removing: Removing
+  match-yes: yes
+  match-no: no
+  open-logs: Open logs
+  details-page-title-suffix: details
+  report-definitions: Container reports
+  add-report: Add report
+  loading-reports: Loading reports...
+  create-report: Create report
+  edit-report: Edit report
+  new-report: New report
+  report-form-description: Shared reports can be reused in details-page fields across multiple card templates.
+  report-id: Report ID
+  report-description: Description
+  report-command: Command inside container
+  report-jql-template: JQL template
+  report-jql-placeholder: 'project = CB AND text ~ "\"{value}\"" ORDER BY updated DESC'
+  report-jql-description: 'For the Jira Issues parser, this field runs on the Dozzle backend as a JQL template. Available placeholders: {value}, {field}, and {row}.'
+  report-file-path: File path
+  report-file-path-placeholder: /usr/local/tomcat/app/conf/cache.properties
+  report-file-pattern: File pattern
+  report-file-pattern-placeholder: "*.jar"
+  report-show-file-size: Show file size
+  report-show-checksum: Show SHA-256
+  report-exclude-patterns: Exclude patterns
+  report-exclude-patterns-placeholder: org.unidata.mdm.system.cache*
+  report-exclude-patterns-description: Comma-separated glob patterns. Matching properties are excluded from the table.
+  report-linked-report-id: Linked report
+  report-linked-report-id-placeholder: report-jira-issues
+  report-linked-report-label: Report button label
+  report-linked-report-label-placeholder: Open issues
+  report-parser: Parser
+  report-parser-text: Text
+  report-parser-json: JSON report
+  report-parser-jar_modules: JAR modules table
+  report-parser-jira_issues: Jira issues list
+  report-parser-properties_template: Properties template
+  report-parser-file_listing: File listing
+  report-parser-file_content: File content
+  report-display-mode: Report display
+  report-display-inline: Inline block
+  report-display-page: Separate page
+  report-refresh-mode: Report refresh
+  report-refresh-ttl: Time-based
+  report-refresh-container_update: On container update
+  report-refresh-manual: Manual
+  report-refresh-on_open: On open
+  report-timeout: Timeout (sec)
+  report-cache-ttl: Cache TTL (sec)
+  kind-text: Text
+  kind-container-field: Built-in container field
+  kind-template-text: Text -> environment variable
+  kind-static-text: Text -> text
+  kind-link: Link
+  kind-report: Report
+  detail-link-url-placeholder: 'https://wiki.example/{name}'
+  detail-link-text-placeholder: Open module page
+  detail-template-text-placeholder: CACHE_GROUP
+  detail-template-text-hint: Enter a container environment variable name such as CACHE_GROUP or JAVA_OPTS.
+  detail-static-text-placeholder: Static text without placeholders
+  detail-static-text-hint: This field renders text as-is without substituting container variables.
+  detail-report-placeholder: Select report
+  report-loading: Loading report...
+  show-vulnerabilities: Show vulnerability report
+  vulnerability-report-title: Vulnerability report
+  vulnerability-package-types: Package types
+  vulnerability-package-types-placeholder: jar, os, python-pkg
+  vulnerability-severities: Severity
+  vulnerability-all-package-types: All package types
+  vulnerability-all-severities: All severities
+  vulnerability-loading: Loading vulnerability report...
+  vulnerability-no-scan: No saved scan result.
+  collapse-section: Collapse
+  expand-section: Expand
+  collapse-all-sections: Collapse all
+  expand-all-sections: Expand all
+  section-navigation: Section navigation
+  open-report: Open report
+  report-page-title-suffix: report
+  report-not-generated: Report has not been generated yet. Click Refresh.
 button:
   logout: Logout
   login: Login
@@ -140,6 +309,9 @@ placeholder:
   search-containers: Search containers (⌘ + k, ⌃k)
   search: Search
 settings:
+  card-templates-description: Shared card templates control how the container cards look for all users.
+  loading-card-templates: Loading card templates...
+  open-card-templates: Open Card Templates
   help-support: >
     Please support Dozzle by donating or sponsoring us on GitHub. Your contributions help us improve Dozzle for
     everyone. Thank you! 🙏🏼
@@ -278,7 +450,7 @@ notifications:
     name: Template name
     name-placeholder: e.g. Security summary
     body: Template body
-    body-placeholder: "{{ .Detail }}"
+    body-placeholder: "Example: dot-Detail variable"
     body-hint: Supports the same Go template variables as destinations and alerts.
     cancel: Cancel
     create: Create Template
@@ -360,7 +532,13 @@ notifications:
     telegram-thread-id: Thread ID
     telegram-parse-mode: Parse mode
     telegram-no-parse-mode: None
-    telegram-template-placeholder: "{{ .Detail }}"
+    telegram-proxy-type: Proxy
+    telegram-proxy-none: No proxy
+    telegram-proxy-type-hint: SOCKS5 proxy for Telegram Bot API requests.
+    telegram-proxy-address: Proxy address
+    telegram-proxy-username: Proxy username
+    telegram-proxy-password: Proxy password
+    telegram-template-placeholder: "Example: dot-Detail variable"
     telegram-template-hint: Go template text. Supports .Container, .Detail, .Subscription and other notification fields.
     shared-template: Shared template
     no-shared-template: No shared template

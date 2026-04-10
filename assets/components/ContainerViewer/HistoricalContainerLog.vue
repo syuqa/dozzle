@@ -3,6 +3,13 @@
     <template #header v-if="showTitle">
       <div class="@container mx-2 flex items-center gap-2 md:ml-4">
         <ContainerTitle :container="container" />
+        <span
+          v-if="config.enableLogIncidentDebug"
+          class="badge badge-outline badge-sm"
+          :class="config.enableLogIncidentMatch ? 'badge-success' : 'badge-warning'"
+        >
+          incident matching: {{ config.enableLogIncidentMatch ? "on" : "off" }}
+        </span>
         <router-link
           :to="{ name: '/container/[id]', params: { id: container.id } }"
           class="btn btn-secondary btn-sm"

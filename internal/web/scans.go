@@ -8,6 +8,7 @@ import (
 
 	"github.com/amir20/dozzle/internal/scan"
 	"github.com/go-chi/chi/v5"
+	"github.com/rs/zerolog/log"
 )
 
 type ScanManager interface {
@@ -34,11 +35,16 @@ func (h *handler) getContainerScan(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusServiceUnavailable, "scan manager is not configured")
 		return
 	}
-	state := h.scanManager.GetState(hostKey(r), chi.URLParam(r, "id"))
+	host := hostKey(r)
+	containerID := chi.URLParam(r, "id")
+	log.Debug().Str("host", host).Str("container", containerID).Msg("fetching container scan state")
+	state := h.scanManager.GetState(host, containerID)
 	if state == nil {
+		log.Debug().Str("host", host).Str("container", containerID).Msg("container scan state not found")
 		writeError(w, http.StatusNotFound, "scan state not found")
 		return
 	}
+	log.Debug().Str("host", host).Str("container", containerID).Msg("container scan state fetched")
 	writeJSON(w, http.StatusOK, state)
 }
 

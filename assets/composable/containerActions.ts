@@ -10,6 +10,7 @@ export const useContainerActions = (container: Ref<Container>) => {
     restart: false,
     start: false,
     update: false,
+    injectLogsButton: false,
   });
 
   async function actionHandler(action: ContainerActions) {
@@ -131,11 +132,43 @@ export const useContainerActions = (container: Ref<Container>) => {
     }
   }
 
+  async function injectLogsButton(indexPath: string, alias: string, logsUrl: string) {
+    const url = `/api/hosts/${container.value.host}/containers/${container.value.id}/actions/inject-logs-button`;
+    actionStates.injectLogsButton = true;
+
+    try {
+      const response = await fetch(withBase(url), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ indexPath, alias, logsUrl }),
+      });
+
+      if (!response.ok) {
+        const message = (await response.text()) || t("error.unable-to-complete-action");
+        showToast({ type: "error", message, title: t("error.action-failed") });
+        return false;
+      }
+
+      showToast({
+        type: "info",
+        title: t("card-templates.inject-logs-button"),
+        message: t("card-templates.inject-success"),
+      });
+      return true;
+    } catch {
+      showToast({ type: "error", message: t("error.something-went-wrong"), title: t("error.action-failed") });
+      return false;
+    } finally {
+      actionStates.injectLogsButton = false;
+    }
+  }
+
   return {
     actionStates,
     start: () => actionHandler("start"),
     stop: () => actionHandler("stop"),
     restart: () => actionHandler("restart"),
     update,
+    injectLogsButton,
   };
 };

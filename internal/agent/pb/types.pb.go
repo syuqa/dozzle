@@ -1023,6 +1023,11 @@ type NotificationDispatcher struct {
 	ChatId          string                 `protobuf:"bytes,11,opt,name=chatId,proto3" json:"chatId,omitempty"`
 	MessageThreadId string                 `protobuf:"bytes,12,opt,name=messageThreadId,proto3" json:"messageThreadId,omitempty"`
 	ParseMode       string                 `protobuf:"bytes,13,opt,name=parseMode,proto3" json:"parseMode,omitempty"`
+	ProxyType       string                 `protobuf:"bytes,14,opt,name=proxyType,proto3" json:"proxyType,omitempty"`
+	ProxyAddress    string                 `protobuf:"bytes,15,opt,name=proxyAddress,proto3" json:"proxyAddress,omitempty"`
+	ProxyUsername   string                 `protobuf:"bytes,16,opt,name=proxyUsername,proto3" json:"proxyUsername,omitempty"`
+	ProxyPassword   string                 `protobuf:"bytes,17,opt,name=proxyPassword,proto3" json:"proxyPassword,omitempty"`
+	ProxySecret     string                 `protobuf:"bytes,18,opt,name=proxySecret,proto3" json:"proxySecret,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -1144,6 +1149,41 @@ func (x *NotificationDispatcher) GetMessageThreadId() string {
 func (x *NotificationDispatcher) GetParseMode() string {
 	if x != nil {
 		return x.ParseMode
+	}
+	return ""
+}
+
+func (x *NotificationDispatcher) GetProxyType() string {
+	if x != nil {
+		return x.ProxyType
+	}
+	return ""
+}
+
+func (x *NotificationDispatcher) GetProxyAddress() string {
+	if x != nil {
+		return x.ProxyAddress
+	}
+	return ""
+}
+
+func (x *NotificationDispatcher) GetProxyUsername() string {
+	if x != nil {
+		return x.ProxyUsername
+	}
+	return ""
+}
+
+func (x *NotificationDispatcher) GetProxyPassword() string {
+	if x != nil {
+		return x.ProxyPassword
+	}
+	return ""
+}
+
+func (x *NotificationDispatcher) GetProxySecret() string {
+	if x != nil {
+		return x.ProxySecret
 	}
 	return ""
 }
@@ -1318,7 +1358,7 @@ const file_types_proto_rawDesc = "" +
 	" \x01(\tR\x0feventExpression\x12$\n" +
 	"\rstateTriggers\x18\v \x03(\tR\rstateTriggers\x12&\n" +
 	"\x0eholdoffSeconds\x18\f \x01(\x05R\x0eholdoffSeconds\x12\x1a\n" +
-	"\btemplate\x18\r \x01(\tR\btemplate\"\xe9\x03\n" +
+	"\btemplate\x18\r \x01(\tR\btemplate\"\x99\x05\n" +
 	"\x16NotificationDispatcher\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x05R\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x12\n" +
@@ -1333,7 +1373,12 @@ const file_types_proto_rawDesc = "" +
 	" \x01(\tR\bbotToken\x12\x16\n" +
 	"\x06chatId\x18\v \x01(\tR\x06chatId\x12(\n" +
 	"\x0fmessageThreadId\x18\f \x01(\tR\x0fmessageThreadId\x12\x1c\n" +
-	"\tparseMode\x18\r \x01(\tR\tparseMode\x1a:\n" +
+	"\tparseMode\x18\r \x01(\tR\tparseMode\x12\x1c\n" +
+	"\tproxyType\x18\x0e \x01(\tR\tproxyType\x12\"\n" +
+	"\fproxyAddress\x18\x0f \x01(\tR\fproxyAddress\x12$\n" +
+	"\rproxyUsername\x18\x10 \x01(\tR\rproxyUsername\x12$\n" +
+	"\rproxyPassword\x18\x11 \x01(\tR\rproxyPassword\x12 \n" +
+	"\vproxySecret\x18\x12 \x01(\tR\vproxySecret\x1a:\n" +
 	"\fHeadersEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xe7\x01\n" +

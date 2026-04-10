@@ -19,6 +19,36 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+func isExpectedDockerStreamClose(err error) bool {
+	if err == nil {
+		return false
+	}
+	if err == io.EOF || err == context.Canceled {
+		return true
+	}
+	message := err.Error()
+	return strings.Contains(message, "use of closed network connection") ||
+		strings.Contains(message, "context canceled") ||
+		strings.Contains(message, "file already closed")
+}
+
+func closeExecInput(writer io.WriteCloser) {
+	type closeWriter interface {
+		CloseWrite() error
+	}
+
+	if halfCloser, ok := writer.(closeWriter); ok {
+		if err := halfCloser.CloseWrite(); err != nil && !isExpectedDockerStreamClose(err) {
+			log.Debug().Err(err).Msg("error while half-closing docker exec stdin")
+		}
+		return
+	}
+
+	if err := writer.Close(); err != nil && !isExpectedDockerStreamClose(err) {
+		log.Debug().Err(err).Msg("error while closing docker exec stdin")
+	}
+}
+
 // DockerUpdateClient extends container.Client with Docker-specific update operations.
 type DockerUpdateClient interface {
 	container.Client
@@ -32,6 +62,17 @@ type DockerUpdateClient interface {
 type DockerClientService struct {
 	client DockerUpdateClient
 	store  *container.ContainerStore
+}
+
+type nonInteractiveDockerExecClient interface {
+	ContainerExecNonInteractive(ctx context.Context, id string, cmd []string) (*container.ExecSession, error)
+}
+
+func isNonInteractiveExec(events container.ExecEventReader) bool {
+	if modeReader, ok := events.(container.ExecModeReader); ok {
+		return !modeReader.Interactive()
+	}
+	return false
 }
 
 func NewDockerClientService(client DockerUpdateClient, labels container.ContainerLabels) *DockerClientService {
@@ -257,7 +298,9 @@ func (d *DockerClientService) Attach(ctx context.Context, c container.Container,
 			if err != nil {
 				if err != io.EOF {
 					log.Error().Err(err).Msg("error while reading event")
+					cancel()
 				}
+				closeExecInput(session.Writer)
 				break
 			}
 
@@ -265,6 +308,8 @@ func (d *DockerClientService) Attach(ctx context.Context, c container.Container,
 			case "userinput":
 				if _, err := session.Writer.Write([]byte(event.Data)); err != nil {
 					log.Error().Err(err).Msg("error while writing to container")
+					cancel()
+					closeExecInput(session.Writer)
 					break loop
 				}
 			case "resize":
@@ -275,17 +320,15 @@ func (d *DockerClientService) Attach(ctx context.Context, c container.Container,
 				log.Warn().Str("type", event.Type).Msg("unknown event type")
 			}
 		}
-		cancel()
-		session.Writer.Close()
 	})
 
 	wg.Go(func() {
 		if c.Tty {
-			if _, err := io.Copy(stdout, session.Reader); err != nil {
+			if _, err := io.Copy(stdout, session.Reader); err != nil && !isExpectedDockerStreamClose(err) {
 				log.Error().Err(err).Msg("error while writing to ws")
 			}
 		} else {
-			if _, err := stdcopy.StdCopy(stdout, stdout, session.Reader); err != nil {
+			if _, err := stdcopy.StdCopy(stdout, stdout, session.Reader); err != nil && !isExpectedDockerStreamClose(err) {
 				log.Error().Err(err).Msg("error while writing to ws")
 			}
 		}
@@ -300,6 +343,11 @@ func (d *DockerClientService) Attach(ctx context.Context, c container.Container,
 func (d *DockerClientService) Exec(ctx context.Context, c container.Container, cmd []string, events container.ExecEventReader, stdout io.Writer) error {
 	cancelCtx, cancel := context.WithCancel(ctx)
 	session, err := d.client.ContainerExec(cancelCtx, c.ID, cmd)
+	if isNonInteractiveExec(events) {
+		if client, ok := d.client.(nonInteractiveDockerExecClient); ok {
+			session, err = client.ContainerExecNonInteractive(cancelCtx, c.ID, cmd)
+		}
+	}
 	if err != nil {
 		cancel()
 		return err
@@ -314,7 +362,9 @@ func (d *DockerClientService) Exec(ctx context.Context, c container.Container, c
 			if err != nil {
 				if err != io.EOF {
 					log.Error().Err(err).Msg("error while reading event")
+					cancel()
 				}
+				closeExecInput(session.Writer)
 				break
 			}
 
@@ -322,6 +372,8 @@ func (d *DockerClientService) Exec(ctx context.Context, c container.Container, c
 			case "userinput":
 				if _, err := session.Writer.Write([]byte(event.Data)); err != nil {
 					log.Error().Err(err).Msg("error while writing to container")
+					cancel()
+					closeExecInput(session.Writer)
 					break loop
 				}
 			case "resize":
@@ -332,14 +384,17 @@ func (d *DockerClientService) Exec(ctx context.Context, c container.Container, c
 				log.Warn().Str("type", event.Type).Msg("unknown event type")
 			}
 		}
-		cancel()
-		session.Writer.Close()
 	})
 
 	wg.Go(func() {
-		// TTY mode outputs raw bytes without Docker's multiplexing headers.
-		if _, err := io.Copy(stdout, session.Reader); err != nil {
-			log.Error().Err(err).Msg("error while writing to ws")
+		if session.Tty {
+			if _, err := io.Copy(stdout, session.Reader); err != nil && !isExpectedDockerStreamClose(err) {
+				log.Error().Err(err).Msg("error while writing to ws")
+			}
+		} else {
+			if _, err := stdcopy.StdCopy(stdout, stdout, session.Reader); err != nil && !isExpectedDockerStreamClose(err) {
+				log.Error().Err(err).Msg("error while writing to ws")
+			}
 		}
 		cancel()
 	})

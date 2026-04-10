@@ -17,3 +17,5 @@ coverage.out
 tmp
 .claude/settings.local.json
 .claude/worktrees/
+.codex
+.codex/

@@ -7,6 +7,7 @@ import (
 
 	"io"
 	"io/fs"
+	"strings"
 
 	"github.com/amir20/dozzle/internal/container"
 	docker_support "github.com/amir20/dozzle/internal/support/docker"
@@ -23,6 +24,12 @@ type MockedClient struct {
 	mock.Mock
 	container.Client
 }
+
+type nopWriteCloser struct {
+	io.Writer
+}
+
+func (n nopWriteCloser) Close() error { return nil }
 
 func (m *MockedClient) FindContainer(ctx context.Context, id string) (container.Container, error) {
 	args := m.Called(ctx, id)
@@ -56,6 +63,24 @@ func (m *MockedClient) ContainerStats(context.Context, string, chan<- container.
 func (m *MockedClient) ContainerLogsBetweenDates(ctx context.Context, id string, from time.Time, to time.Time, stdType container.StdType) (io.ReadCloser, error) {
 	args := m.Called(ctx, id, from, to, stdType)
 	return args.Get(0).(io.ReadCloser), args.Error(1)
+}
+
+func (m *MockedClient) ContainerExec(ctx context.Context, id string, cmd []string) (*container.ExecSession, error) {
+	args := m.Called(ctx, id, cmd)
+	return &container.ExecSession{
+		Writer: nopWriteCloser{Writer: io.Discard},
+		Reader: strings.NewReader(""),
+		Resize: func(width uint, height uint) error { return nil },
+	}, args.Error(1)
+}
+
+func (m *MockedClient) ContainerAttach(ctx context.Context, id string) (*container.ExecSession, error) {
+	args := m.Called(ctx, id)
+	return &container.ExecSession{
+		Writer: nopWriteCloser{Writer: io.Discard},
+		Reader: strings.NewReader(""),
+		Resize: func(width uint, height uint) error { return nil },
+	}, args.Error(1)
 }
 
 func (m *MockedClient) ImagePull(ctx context.Context, image string) (io.ReadCloser, error) {

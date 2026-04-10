@@ -114,6 +114,10 @@ type jsonEventReader struct {
 	conn *websocket.Conn
 }
 
+func (r *jsonEventReader) Interactive() bool {
+	return true
+}
+
 func (r *jsonEventReader) ReadEvent() (*container.ExecEvent, error) {
 	_, message, err := r.conn.ReadMessage()
 	if err != nil {

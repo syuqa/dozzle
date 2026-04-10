@@ -42,6 +42,15 @@ func containerStateKey(host, containerID string) string {
 	return host + ":" + containerID
 }
 
+const containerIdentityLabel = "dev.dozzle.link-id"
+
+func containerIdentityKey(host string, current container.Container) string {
+	if ref := strings.TrimSpace(current.Labels[containerIdentityLabel]); ref != "" {
+		return host + ":label:" + ref
+	}
+	return host + ":name:" + current.Name
+}
+
 func (m *Manager) processContainerEvents() {
 	for {
 		select {
@@ -65,10 +74,20 @@ func (m *Manager) processContainerEvent(envelope *ContainerEventEnvelope) {
 	}
 
 	containerKey := containerStateKey(host.ID, current.ID)
-	previous, hadPrevious := m.containerSnapshots.Load(containerKey)
+	previousByID, hadPreviousByID := m.containerSnapshots.Load(containerKey)
 	m.containerSnapshots.Store(containerKey, current)
-	if !hadPrevious {
+
+	identityKey := containerIdentityKey(host.ID, current)
+	previousByIdentity, hadPreviousByIdentity := m.identitySnapshots.Load(identityKey)
+	m.identitySnapshots.Store(identityKey, current)
+
+	if !hadPreviousByID && !hadPreviousByIdentity {
 		return
+	}
+
+	previous := previousByID
+	if !hadPreviousByID && hadPreviousByIdentity {
+		previous = previousByIdentity
 	}
 
 	notificationContainer := FromContainerModel(current, host)
@@ -97,6 +116,11 @@ func (m *Manager) processContainerEvent(envelope *ContainerEventEnvelope) {
 
 		if sub.IsStateAlert() {
 			triggered := detectStateTriggers(previous, current, envelope.Event)
+			if hadPreviousByIdentity {
+				if payload, ok := detectImageUpdateTrigger(previousByIdentity, current, envelope.Event); ok {
+					triggered[StateTriggerImageUpdated] = payload
+				}
+			}
 			for _, trigger := range sub.StateTriggers {
 				if payload, ok := triggered[trigger]; ok {
 					m.queueStateAlert(sub, current, host, payload)
@@ -106,6 +130,27 @@ func (m *Manager) processContainerEvent(envelope *ContainerEventEnvelope) {
 
 		return true
 	})
+}
+
+func detectImageUpdateTrigger(previous container.Container, current container.Container, event container.ContainerEvent) (pendingStateAlert, bool) {
+	if previous.Image == "" || current.Image == "" || previous.Image == current.Image {
+		return pendingStateAlert{}, false
+	}
+
+	return pendingStateAlert{
+		Trigger:        StateTriggerImageUpdated,
+		ContainerID:    current.ID,
+		ContainerKey:   containerStateKey(current.Host, current.ID),
+		ExpectedState:  current.State,
+		ExpectedHealth: current.Health,
+		ExpectedImage:  current.Image,
+		PreviousState:  previous.State,
+		CurrentState:   current.State,
+		PreviousImage:  previous.Image,
+		CurrentImage:   current.Image,
+		EventName:      event.Name,
+		Attributes:     event.ActorAttributes,
+	}, true
 }
 
 func detectStateTriggers(previous container.Container, current container.Container, event container.ContainerEvent) map[string]pendingStateAlert {
@@ -127,8 +172,8 @@ func detectStateTriggers(previous container.Container, current container.Contain
 		triggered[trigger] = payload
 	}
 
-	if previous.Image != "" && current.Image != "" && previous.Image != current.Image {
-		add(StateTriggerImageUpdated, pendingStateAlert{})
+	if payload, ok := detectImageUpdateTrigger(previous, current, event); ok {
+		triggered[StateTriggerImageUpdated] = payload
 	}
 
 	started := previous.State != "running" && current.State == "running"

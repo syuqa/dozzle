@@ -48,6 +48,13 @@ declare module 'vue-router/auto-routes' {
       { id: ParamValue<false> },
       | never
     >,
+    '/container/[id].details': RouteRecordInfo<
+      '/container/[id].details',
+      '/container/:id/details',
+      { id: ParamValue<true> },
+      { id: ParamValue<false> },
+      | never
+    >,
     '/container/[id].time.[datetime]': RouteRecordInfo<
       '/container/[id].time.[datetime]',
       '/container/:id/time/:datetime',
@@ -160,6 +167,12 @@ declare module 'vue-router/auto-routes' {
     'assets/pages/container/[id].vue': {
       routes:
         | '/container/[id]'
+      views:
+        | never
+    }
+    'assets/pages/container/[id].details.vue': {
+      routes:
+        | '/container/[id].details'
       views:
         | never
     }

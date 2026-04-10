@@ -27,6 +27,7 @@ func mockedClient() *MockedClient {
 	mockedClient.On("ContainerActions", mock.Anything, container.Restart, c.ID).Return(nil)
 	mockedClient.On("ContainerActions", mock.Anything, container.Start, mock.Anything).Return(errors.New("container not found"))
 	mockedClient.On("ContainerActions", mock.Anything, container.ContainerAction("something-else"), c.ID).Return(errors.New("unknown action"))
+	mockedClient.On("ContainerExec", mock.Anything, c.ID, mock.Anything).Return(nil, nil)
 	mockedClient.On("Host").Return(container.Host{ID: "localhost"})
 	mockedClient.On("ListContainers", mock.Anything, mock.Anything).Return([]container.Container{c}, nil)
 	mockedClient.On("ContainerEvents", mock.Anything, mock.Anything).Return(nil)
@@ -165,4 +166,17 @@ func Test_handler_containerUpdate_not_found(t *testing.T) {
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
 	assert.Equal(t, 404, rr.Code)
+}
+
+func Test_handler_containerInjectLogsButton(t *testing.T) {
+	mockedClient := mockedClient()
+
+	handler := createHandler(mockedClient, nil, Config{Base: "/", EnableActions: true, Authorization: Authorization{Provider: NONE}})
+	req, err := http.NewRequest("POST", "/api/hosts/localhost/containers/123/actions/inject-logs-button", strings.NewReader(`{"indexPath":"/usr/share/nginx/html/index.html","alias":"udg-backend-1","logsUrl":"http://localhost:8080/container/ref/udg-backend-1"}`))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+	assert.Equal(t, 204, rr.Code)
 }

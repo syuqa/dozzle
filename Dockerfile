@@ -47,7 +47,7 @@ COPY shared_key.pem shared_cert.pem ./
 COPY --from=node /build/dist ./dist
 
 # Args
-ARG TAG=v10.1.2
+ARG TAG=v10.3.0
 ARG TARGETOS TARGETARCH
 
 # Build binary

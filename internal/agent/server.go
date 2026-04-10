@@ -22,6 +22,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/keepalive"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -377,7 +378,8 @@ type terminalMessage interface {
 
 // protoEventReader converts gRPC protobuf messages directly to ExecEvents (no JSON)
 type protoEventReader struct {
-	recv func() (terminalMessage, error)
+	recv        func() (terminalMessage, error)
+	interactive bool
 }
 
 func (r *protoEventReader) ReadEvent() (*container.ExecEvent, error) {
@@ -394,6 +396,10 @@ func (r *protoEventReader) ReadEvent() (*container.ExecEvent, error) {
 
 	// Skip unknown message types
 	return r.ReadEvent()
+}
+
+func (r *protoEventReader) Interactive() bool {
+	return r.interactive
 }
 
 // terminalStreamWriter adapts a gRPC terminal stream to io.Writer
@@ -419,7 +425,10 @@ func (s *server) ContainerExec(stream pb.AgentService_ContainerExecServer) error
 		return status.Error(codes.NotFound, err.Error())
 	}
 
-	reader := &protoEventReader{recv: func() (terminalMessage, error) { return stream.Recv() }}
+	reader := &protoEventReader{
+		recv:        func() (terminalMessage, error) { return stream.Recv() },
+		interactive: execInteractive(stream.Context()),
+	}
 	writer := &terminalStreamWriter{send: func(p []byte) error { return stream.Send(&pb.ContainerExecResponse{Stdout: p}) }}
 
 	if err := s.service.Exec(stream.Context(), c, request.Command, reader, writer); err != nil {
@@ -427,6 +436,15 @@ func (s *server) ContainerExec(stream pb.AgentService_ContainerExecServer) error
 	}
 
 	return nil
+}
+
+func execInteractive(ctx context.Context) bool {
+	values := metadata.ValueFromIncomingContext(ctx, "x-dozzle-exec-interactive")
+	if len(values) == 0 {
+		return true
+	}
+
+	return values[0] != "false"
 }
 
 func (s *server) ContainerAttach(stream pb.AgentService_ContainerAttachServer) error {
@@ -497,6 +515,11 @@ func (s *server) UpdateNotificationConfig(ctx context.Context, req *pb.UpdateNot
 			ChatID:          d.ChatId,
 			MessageThreadID: d.MessageThreadId,
 			ParseMode:       d.ParseMode,
+			ProxyType:       d.ProxyType,
+			ProxyAddress:    d.ProxyAddress,
+			ProxyUsername:   d.ProxyUsername,
+			ProxyPassword:   d.ProxyPassword,
+			ProxySecret:     d.ProxySecret,
 		}
 		if d.ExpiresAt != nil {
 			t := d.ExpiresAt.AsTime()

@@ -2,6 +2,7 @@ package web
 
 import (
 	"net/http"
+	"sync"
 
 	"github.com/amir20/dozzle/internal/analytics"
 	"github.com/amir20/dozzle/internal/auth"
@@ -36,25 +37,63 @@ func (h *handler) streamEvents(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	allContainers, errors := h.hostService.ListAllContainers(userLabels)
+	type hostContainersResult struct {
+		host       string
+		containers []container.Container
+		err        error
+	}
 
-	for _, err := range errors {
-		log.Warn().Err(err).Msg("error listing containers")
-		if hostNotAvailableError, ok := err.(*docker_support.HostUnavailableError); ok {
-			if err := sseWriter.Event("update-host", hostNotAvailableError.Host); err != nil {
-				log.Error().Err(err).Msg("error writing event to event stream")
+	initialContainers := make(chan hostContainersResult)
+	var initialWG sync.WaitGroup
+	hosts := h.hostService.Hosts()
+
+	for _, host := range hosts {
+		initialWG.Add(1)
+		go func(host container.Host) {
+			defer initialWG.Done()
+			containers, err := h.hostService.ListContainersForHost(host.ID, userLabels)
+			select {
+			case initialContainers <- hostContainersResult{host: host.ID, containers: containers, err: err}:
+			case <-r.Context().Done():
 			}
-		}
+		}(host)
 	}
 
-	if err := sseWriter.Event("containers-changed", allContainers); err != nil {
-		log.Error().Err(err).Msg("error writing containers to event stream")
+	go func() {
+		initialWG.Wait()
+		close(initialContainers)
+	}()
+
+	if err := sseWriter.Event("containers-changed", []container.Container{}); err != nil {
+		log.Error().Err(err).Msg("error writing initial empty containers to event stream")
+		return
 	}
 
-	go sendBeaconEvent(h, r, len(allContainers))
+	go sendBeaconEvent(h, r, 0)
 
 	for {
 		select {
+		case result, ok := <-initialContainers:
+			if !ok {
+				initialContainers = nil
+				continue
+			}
+
+			if result.err != nil {
+				log.Warn().Err(result.err).Str("host", result.host).Msg("error listing containers for host during initial sync")
+				if hostNotAvailableError, ok := result.err.(*docker_support.HostUnavailableError); ok {
+					if err := sseWriter.Event("update-host", hostNotAvailableError.Host); err != nil {
+						log.Error().Err(err).Msg("error writing event to event stream")
+						return
+					}
+				}
+				continue
+			}
+
+			if err := sseWriter.Event("containers-changed", result.containers); err != nil {
+				log.Error().Err(err).Str("host", result.host).Msg("error writing containers to event stream")
+				return
+			}
 		case host := <-availableHosts:
 			if err := sseWriter.Event("update-host", host); err != nil {
 				log.Error().Err(err).Msg("error writing event to event stream")

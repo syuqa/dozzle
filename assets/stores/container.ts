@@ -103,12 +103,11 @@ export const useContainerStore = defineStore("container", () => {
 
     es.onopen = () => {
       removeToast("events-stream");
+      ready.value = true;
       if (containers.value.length > 0) {
         containers.value = [];
       }
     };
-
-    watchOnce(containers, () => (ready.value = true));
   }
 
   connect();

@@ -3,6 +3,13 @@
     <template #header v-if="showTitle">
       <div class="@container mx-2 flex items-center gap-1 md:ml-4 md:gap-2">
         <ContainerTitle :container="container" />
+        <span
+          v-if="config.enableLogIncidentDebug"
+          class="badge badge-outline badge-sm"
+          :class="config.enableLogIncidentMatch ? 'badge-success' : 'badge-warning'"
+        >
+          incident matching: {{ config.enableLogIncidentMatch ? "on" : "off" }}
+        </span>
         <MultiContainerStat
           class="ml-auto lg:hidden lg:@3xl:flex"
           :containers="[container]"

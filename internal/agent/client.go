@@ -24,6 +24,7 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/encoding/gzip"
 	"google.golang.org/grpc/keepalive"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -287,6 +288,7 @@ func (c *Client) StreamNewContainers(ctx context.Context, containers chan<- cont
 }
 
 func (c *Client) FindContainer(ctx context.Context, containerID string, labels container.ContainerLabels) (container.Container, error) {
+	started := time.Now()
 	in := &pb.FindContainerRequest{ContainerId: containerID}
 
 	if labels != nil {
@@ -298,13 +300,17 @@ func (c *Client) FindContainer(ctx context.Context, containerID string, labels c
 
 	response, err := c.client.FindContainer(ctx, in)
 	if err != nil {
+		err = rpcErrToErr(err)
+		log.Warn().Err(err).Str("endpoint", c.endpoint).Str("container", containerID).Interface("labels", labels).Str("deadline", agentContextDeadline(ctx)).Dur("elapsed", time.Since(started)).Msg("agent client find container failed")
 		return container.Container{}, err
 	}
 
+	log.Debug().Str("endpoint", c.endpoint).Str("container", containerID).Interface("labels", labels).Str("deadline", agentContextDeadline(ctx)).Dur("elapsed", time.Since(started)).Msg("agent client find container completed")
 	return container.FromProto(response.Container), nil
 }
 
 func (c *Client) ListContainers(ctx context.Context, labels container.ContainerLabels) ([]container.Container, error) {
+	started := time.Now()
 	in := &pb.ListContainersRequest{}
 
 	if labels != nil {
@@ -316,6 +322,8 @@ func (c *Client) ListContainers(ctx context.Context, labels container.ContainerL
 
 	response, err := c.client.ListContainers(ctx, in)
 	if err != nil {
+		err = rpcErrToErr(err)
+		log.Warn().Err(err).Str("endpoint", c.endpoint).Interface("labels", labels).Str("deadline", agentContextDeadline(ctx)).Dur("elapsed", time.Since(started)).Msg("agent client list containers failed")
 		return nil, err
 	}
 
@@ -324,12 +332,16 @@ func (c *Client) ListContainers(ctx context.Context, labels container.ContainerL
 		containers = append(containers, container.FromProto(c))
 	}
 
+	log.Debug().Str("endpoint", c.endpoint).Interface("labels", labels).Int("count", len(containers)).Str("deadline", agentContextDeadline(ctx)).Dur("elapsed", time.Since(started)).Msg("agent client list containers completed")
 	return containers, nil
 }
 
 func (c *Client) Host(ctx context.Context) (container.Host, error) {
+	started := time.Now()
 	info, err := c.client.HostInfo(ctx, &pb.HostInfoRequest{})
 	if err != nil {
+		err = rpcErrToErr(err)
+		log.Warn().Err(err).Str("endpoint", c.endpoint).Str("deadline", agentContextDeadline(ctx)).Dur("elapsed", time.Since(started)).Msg("agent client host failed")
 		return container.Host{
 			Endpoint:  c.endpoint,
 			Type:      "agent",
@@ -337,7 +349,7 @@ func (c *Client) Host(ctx context.Context) (container.Host, error) {
 		}, err
 	}
 
-	return container.Host{
+	host := container.Host{
 		ID:            info.Host.Id,
 		Name:          info.Host.Name,
 		NCPU:          int(info.Host.CpuCores),
@@ -346,7 +358,9 @@ func (c *Client) Host(ctx context.Context) (container.Host, error) {
 		Type:          "agent",
 		DockerVersion: info.Host.DockerVersion,
 		AgentVersion:  info.Host.AgentVersion,
-	}, nil
+	}
+	log.Debug().Str("endpoint", c.endpoint).Str("host", host.Name).Str("deadline", agentContextDeadline(ctx)).Dur("elapsed", time.Since(started)).Msg("agent client host completed")
+	return host, nil
 }
 
 func (c *Client) RunContainerScan(ctx context.Context, containerID string) (*trivy.Result, error) {
@@ -358,6 +372,17 @@ func (c *Client) RunContainerScan(ctx context.Context, containerID string) (*tri
 	}
 
 	return scanResultFromPb(resp.GetResult()), nil
+}
+
+func agentContextDeadline(ctx context.Context) string {
+	if ctx == nil {
+		return "none"
+	}
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		return "none"
+	}
+	return time.Until(deadline).Round(time.Millisecond).String()
 }
 
 func (c *Client) ContainerAction(ctx context.Context, containerId string, action container.ContainerAction) error {
@@ -532,6 +557,13 @@ func (c *Client) ContainerAttach(ctx context.Context, containerId string) (*cont
 }
 
 func (c *Client) Exec(ctx context.Context, containerId string, cmd []string, events container.ExecEventReader, stdout io.Writer) error {
+	interactive := true
+	if modeReader, ok := events.(container.ExecModeReader); ok {
+		interactive = modeReader.Interactive()
+	}
+
+	ctx = metadata.AppendToOutgoingContext(ctx, "x-dozzle-exec-interactive", fmt.Sprintf("%t", interactive))
+
 	stream, err := c.client.ContainerExec(ctx)
 	if err != nil {
 		return err
@@ -629,6 +661,11 @@ func (c *Client) UpdateNotificationConfig(ctx context.Context, subscriptions []t
 			ChatId:          d.ChatID,
 			MessageThreadId: d.MessageThreadID,
 			ParseMode:       d.ParseMode,
+			ProxyType:       d.ProxyType,
+			ProxyAddress:    d.ProxyAddress,
+			ProxyUsername:   d.ProxyUsername,
+			ProxyPassword:   d.ProxyPassword,
+			ProxySecret:     d.ProxySecret,
 		}
 		if d.ExpiresAt != nil {
 			pbDispatchers[i].ExpiresAt = timestamppb.New(*d.ExpiresAt)

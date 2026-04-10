@@ -192,6 +192,11 @@ type DispatcherConfig struct {
 	ChatID          string            `json:"chatId,omitempty" yaml:"chatId,omitempty"`
 	MessageThreadID string            `json:"messageThreadId,omitempty" yaml:"messageThreadId,omitempty"`
 	ParseMode       string            `json:"parseMode,omitempty" yaml:"parseMode,omitempty"`
+	ProxyType       string            `json:"proxyType,omitempty" yaml:"proxyType,omitempty"`
+	ProxyAddress    string            `json:"proxyAddress,omitempty" yaml:"proxyAddress,omitempty"`
+	ProxyUsername   string            `json:"proxyUsername,omitempty" yaml:"proxyUsername,omitempty"`
+	ProxyPassword   string            `json:"proxyPassword,omitempty" yaml:"proxyPassword,omitempty"`
+	ProxySecret     string            `json:"proxySecret,omitempty" yaml:"proxySecret,omitempty"`
 }
 
 type NotificationTemplate struct {

@@ -16,6 +16,8 @@ import (
 
 	"github.com/amir20/dozzle/internal/agent"
 	"github.com/amir20/dozzle/internal/auth"
+	"github.com/amir20/dozzle/internal/cardreports"
+	"github.com/amir20/dozzle/internal/cardtemplates"
 	"github.com/amir20/dozzle/internal/cloud"
 	"github.com/amir20/dozzle/internal/docker"
 	"github.com/amir20/dozzle/internal/k8s"
@@ -241,6 +243,15 @@ func createServer(args cli.Args, hostService web.HostService, onCloudSetup func(
 		scanManager = manager
 	}
 
+	cardTemplateManager, err := cardtemplates.NewManager()
+	if err != nil {
+		log.Fatal().Err(err).Msg("Could not create card template manager")
+	}
+	cardReportManager, err := cardreports.NewManager()
+	if err != nil {
+		log.Fatal().Err(err).Msg("Could not create card report manager")
+	}
+
 	config := web.Config{
 		Addr:                args.Addr,
 		Base:                args.Base,
@@ -248,6 +259,7 @@ func createServer(args cli.Args, hostService web.HostService, onCloudSetup func(
 		Hostname:            args.Hostname,
 		AppName:             args.AppName,
 		AppLogoURL:          args.AppLogoURL,
+		PublicURL:           args.PublicURL,
 		ScanStatusEndpoint:  args.ScanStatusEndpoint,
 		LogIncidentEndpoint: args.LogIncidentEndpoint,
 		LogIncidentDebug:    args.LogIncidentDebug,
@@ -264,6 +276,8 @@ func createServer(args cli.Args, hostService web.HostService, onCloudSetup func(
 		EnableContainerScan: args.EnableContainerScan,
 		TrivyPath:           args.TrivyPath,
 		ScanManager:         scanManager,
+		CardTemplateManager: cardTemplateManager,
+		CardReportManager:   cardReportManager,
 		EnableShell:         args.EnableShell,
 		DisableAvatars:      args.DisableAvatars,
 		ReleaseCheckMode:    releaseCheckMode,

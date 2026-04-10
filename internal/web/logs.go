@@ -246,6 +246,13 @@ func (h *handler) fetchLogsBetweenDates(w http.ResponseWriter, r *http.Request) 
 
 func (h *handler) streamContainerLogs(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
+	userLabels := h.resolveLabels(r)
+
+	// Stop EventSource reconnect loops when the container no longer exists.
+	if _, err := h.hostService.FindContainer(hostKey(r), id, userLabels); err != nil {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
 
 	h.streamLogsForContainers(w, r, func(container *container.Container) bool {
 		return container.ID == id && container.Host == hostKey(r)

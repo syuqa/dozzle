@@ -55,6 +55,14 @@ type DockerClient struct {
 	info system.Info
 }
 
+type nopWriteCloser struct {
+	io.Writer
+}
+
+func (n nopWriteCloser) Close() error {
+	return nil
+}
+
 func NewClient(cli DockerCLI, host container.Host) *DockerClient {
 	info, err := cli.Info(context.Background())
 	if err != nil {
@@ -406,17 +414,26 @@ func (d *DockerClient) ContainerAttach(ctx context.Context, id string) (*contain
 		Writer: waiter.Conn,
 		Reader: waiter.Reader,
 		Resize: resizeFn,
+		Tty:    true,
 	}, nil
 }
 
 func (d *DockerClient) ContainerExec(ctx context.Context, id string, cmd []string) (*container.ExecSession, error) {
+	return d.containerExec(ctx, id, cmd, true)
+}
+
+func (d *DockerClient) ContainerExecNonInteractive(ctx context.Context, id string, cmd []string) (*container.ExecSession, error) {
+	return d.containerExec(ctx, id, cmd, false)
+}
+
+func (d *DockerClient) containerExec(ctx context.Context, id string, cmd []string, interactive bool) (*container.ExecSession, error) {
 	log.Debug().Str("id", id).Str("host", d.host.Name).Msg("Executing command in container")
 	options := docker.ExecOptions{
 		AttachStdout: true,
 		AttachStderr: true,
-		AttachStdin:  true,
+		AttachStdin:  interactive,
 		Cmd:          cmd,
-		Tty:          true,
+		Tty:          interactive,
 	}
 
 	execID, err := d.cli.ContainerExecCreate(ctx, id, options)
@@ -424,31 +441,38 @@ func (d *DockerClient) ContainerExec(ctx context.Context, id string, cmd []strin
 		return nil, err
 	}
 
-	waiter, err := d.cli.ContainerExecAttach(ctx, execID.ID, docker.ExecAttachOptions{Tty: true})
+	waiter, err := d.cli.ContainerExecAttach(ctx, execID.ID, docker.ExecAttachOptions{Tty: interactive})
 	if err != nil {
 		return nil, err
 	}
 
-	// Initial resize
-	if err = d.cli.ContainerExecResize(ctx, execID.ID, docker.ResizeOptions{
-		Width:  100,
-		Height: 40,
-	}); err != nil {
-		return nil, err
-	}
+	resizeFn := func(width uint, height uint) error { return nil }
+	writer := io.WriteCloser(waiter.Conn)
+	if !interactive {
+		writer = nopWriteCloser{Writer: io.Discard}
+	} else {
+		// Initial resize
+		if err = d.cli.ContainerExecResize(ctx, execID.ID, docker.ResizeOptions{
+			Width:  100,
+			Height: 40,
+		}); err != nil {
+			return nil, err
+		}
 
-	// Create resize closure that captures execID and context
-	resizeFn := func(width uint, height uint) error {
-		return d.cli.ContainerExecResize(ctx, execID.ID, docker.ResizeOptions{
-			Width:  width,
-			Height: height,
-		})
+		// Create resize closure that captures execID and context
+		resizeFn = func(width uint, height uint) error {
+			return d.cli.ContainerExecResize(ctx, execID.ID, docker.ResizeOptions{
+				Width:  width,
+				Height: height,
+			})
+		}
 	}
 
 	return &container.ExecSession{
-		Writer: waiter.Conn,
+		Writer: writer,
 		Reader: waiter.Reader,
 		Resize: resizeFn,
+		Tty:    interactive,
 	}, nil
 }
 

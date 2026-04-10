@@ -149,6 +149,11 @@ type DispatcherConfig struct {
 	ChatID          string
 	MessageThreadID string
 	ParseMode       string
+	ProxyType       string
+	ProxyAddress    string
+	ProxyUsername   string
+	ProxyPassword   string
+	ProxySecret     string
 }
 
 type NotificationTemplate struct {

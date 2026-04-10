@@ -78,6 +78,11 @@ func (m *Manager) LoadConfig(r io.Reader) error {
 			ChatID:          d.ChatID,
 			MessageThreadID: d.MessageThreadID,
 			ParseMode:       d.ParseMode,
+			ProxyType:       d.ProxyType,
+			ProxyAddress:    d.ProxyAddress,
+			ProxyUsername:   d.ProxyUsername,
+			ProxyPassword:   d.ProxyPassword,
+			ProxySecret:     d.ProxySecret,
 		}
 	}
 
@@ -217,6 +222,11 @@ func (m *Manager) HandleNotificationConfig(subscriptions []types.SubscriptionCon
 			ChatID:          dc.ChatID,
 			MessageThreadID: dc.MessageThreadID,
 			ParseMode:       dc.ParseMode,
+			ProxyType:       dc.ProxyType,
+			ProxyAddress:    dc.ProxyAddress,
+			ProxyUsername:   dc.ProxyUsername,
+			ProxyPassword:   dc.ProxyPassword,
+			ProxySecret:     dc.ProxySecret,
 		}
 		d, err := m.createDispatcher(cfg)
 		if err != nil {
@@ -247,6 +257,11 @@ func createDispatcher(config DispatcherConfig) (dispatcher.Dispatcher, error) {
 			config.ChatID,
 			config.MessageThreadID,
 			config.ParseMode,
+			config.ProxyType,
+			config.ProxyAddress,
+			config.ProxyUsername,
+			config.ProxyPassword,
+			config.ProxySecret,
 			config.Template,
 		)
 	default:

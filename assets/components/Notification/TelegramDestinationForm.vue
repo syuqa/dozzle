@@ -38,6 +38,32 @@
     </fieldset>
 
     <fieldset class="fieldset">
+      <legend class="fieldset-legend text-lg">{{ $t("notifications.destination-form.telegram-proxy-type") }}</legend>
+      <select v-model="proxyType" class="select select-bordered w-full">
+        <option value="">{{ $t("notifications.destination-form.telegram-proxy-none") }}</option>
+        <option value="socks5">SOCKS5</option>
+      </select>
+      <p class="text-base-content/50 mt-1 text-xs">
+        {{ $t("notifications.destination-form.telegram-proxy-type-hint") }}
+      </p>
+    </fieldset>
+
+    <fieldset v-if="proxyType" class="fieldset">
+      <legend class="fieldset-legend text-lg">{{ $t("notifications.destination-form.telegram-proxy-address") }}</legend>
+      <input v-model="proxyAddress" type="text" class="input input-bordered w-full" placeholder="host:port" />
+    </fieldset>
+
+    <fieldset v-if="proxyType === 'socks5'" class="fieldset">
+      <legend class="fieldset-legend text-lg">{{ $t("notifications.destination-form.telegram-proxy-username") }}</legend>
+      <input v-model="proxyUsername" type="text" class="input input-bordered w-full" />
+    </fieldset>
+
+    <fieldset v-if="proxyType === 'socks5'" class="fieldset">
+      <legend class="fieldset-legend text-lg">{{ $t("notifications.destination-form.telegram-proxy-password") }}</legend>
+      <input v-model="proxyPassword" type="password" class="input input-bordered w-full" />
+    </fieldset>
+
+    <fieldset class="fieldset">
       <legend class="fieldset-legend text-lg">{{ $t("notifications.destination-form.shared-template") }}</legend>
       <select v-model.number="templateId" class="select select-bordered w-full">
         <option :value="0">{{ $t("notifications.destination-form.no-shared-template") }}</option>
@@ -98,6 +124,10 @@ const botToken = ref(destination?.botToken ?? "");
 const chatId = ref(destination?.chatId ?? "");
 const messageThreadId = ref(destination?.messageThreadId ?? "");
 const parseMode = ref(destination?.parseMode ?? "HTML");
+const proxyType = ref(destination?.proxyType ?? "");
+const proxyAddress = ref(destination?.proxyAddress ?? "");
+const proxyUsername = ref(destination?.proxyUsername ?? "");
+const proxyPassword = ref(destination?.proxyPassword ?? "");
 const template = ref(destination?.template ?? "");
 const templateId = ref(destination?.templateId ?? 0);
 const isTesting = ref(false);
@@ -124,6 +154,10 @@ async function testDestination() {
         chatId: chatId.value.trim(),
         messageThreadId: messageThreadId.value.trim() || undefined,
         parseMode: parseMode.value,
+        proxyType: proxyType.value || undefined,
+        proxyAddress: proxyAddress.value.trim() || undefined,
+        proxyUsername: proxyUsername.value.trim() || undefined,
+        proxyPassword: proxyPassword.value.trim() || undefined,
         templateId: templateId.value || undefined,
         template: template.value.trim() || undefined,
       }),
@@ -148,6 +182,10 @@ async function saveDestination() {
       chatId: chatId.value.trim(),
       messageThreadId: messageThreadId.value.trim() || undefined,
       parseMode: parseMode.value,
+      proxyType: proxyType.value || undefined,
+      proxyAddress: proxyAddress.value.trim() || undefined,
+      proxyUsername: proxyUsername.value.trim() || undefined,
+      proxyPassword: proxyPassword.value.trim() || undefined,
       templateId: templateId.value || undefined,
       template: template.value.trim() || undefined,
     };

@@ -423,3 +423,44 @@ func TestDetectStateTriggers(t *testing.T) {
 	assert.Contains(t, triggers, StateTriggerUnhealthy)
 	assert.Equal(t, "1", triggers[StateTriggerError].ExitCode)
 }
+
+func TestDetectImageUpdateTrigger(t *testing.T) {
+	previous := container.Container{
+		ID:    "abc",
+		Name:  "api",
+		Image: "repo/api:1.0.0",
+		Host:  "host-1",
+	}
+	current := container.Container{
+		ID:    "def",
+		Name:  "api",
+		Image: "repo/api:1.1.0",
+		Host:  "host-1",
+		State: "running",
+	}
+	event := container.ContainerEvent{
+		Name:    "start",
+		ActorID: "def",
+		Host:    "host-1",
+	}
+
+	payload, ok := detectImageUpdateTrigger(previous, current, event)
+	require.True(t, ok)
+	assert.Equal(t, StateTriggerImageUpdated, payload.Trigger)
+	assert.Equal(t, "repo/api:1.0.0", payload.PreviousImage)
+	assert.Equal(t, "repo/api:1.1.0", payload.CurrentImage)
+	assert.Equal(t, "host-1:def", payload.ContainerKey)
+}
+
+func TestContainerIdentityKey(t *testing.T) {
+	withLabel := container.Container{
+		Name: "api",
+		Labels: map[string]string{
+			"dev.dozzle.link-id": "api-prod",
+		},
+	}
+	assert.Equal(t, "host-1:label:api-prod", containerIdentityKey("host-1", withLabel))
+
+	withoutLabel := container.Container{Name: "api"}
+	assert.Equal(t, "host-1:name:api", containerIdentityKey("host-1", withoutLabel))
+}

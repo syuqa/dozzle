@@ -111,16 +111,15 @@ func (k *K8sClientService) Attach(ctx context.Context, c container.Container, ev
 	var wg sync.WaitGroup
 
 	wg.Go(func() {
-		defer session.Writer.Close()
-		defer cancel()
-
 	loop:
 		for {
 			event, err := events.ReadEvent()
 			if err != nil {
 				if err != io.EOF {
 					log.Error().Err(err).Msg("error reading event")
+					cancel()
 				}
+				session.Writer.Close()
 				break
 			}
 
@@ -128,6 +127,8 @@ func (k *K8sClientService) Attach(ctx context.Context, c container.Container, ev
 			case "userinput":
 				if _, err := session.Writer.Write([]byte(event.Data)); err != nil {
 					log.Error().Err(err).Msg("error writing to container")
+					cancel()
+					session.Writer.Close()
 					break loop
 				}
 			case "resize":
