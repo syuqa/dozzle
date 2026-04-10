@@ -18,4 +18,5 @@ tmp
 .claude/settings.local.json
 .claude/worktrees/
 .codex
+prod.log
 .codex/
